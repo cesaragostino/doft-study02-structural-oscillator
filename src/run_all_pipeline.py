@@ -186,6 +186,52 @@ def build_config_digest(configs_dir: Path, digest_dir: Path, materials_csv: Path
         pass
 
 
+def inject_xi_into_configs(configs_dir: Path, xi_map: Dict[str, float]) -> None:
+    """Add xi value and xi_sign mapping to each material_config_*.json."""
+    import json
+
+    def derive_signs(subnets: List[str]) -> Dict[str, int]:
+        signs: Dict[str, int] = {}
+        # Prefer semantic mapping when sigma/pi present
+        for subnet in subnets:
+            lower = subnet.lower()
+            if "sigma" in lower:
+                signs[subnet] = 1
+            elif "pi" in lower:
+                signs[subnet] = -1
+        # If none set or incomplete, assign alternating signs
+        if not signs:
+            alt = [1, -1]
+            for idx, subnet in enumerate(subnets):
+                signs[subnet] = alt[idx % 2]
+        else:
+            # Fill any missing with alternating pattern continuing current size
+            idx = 0
+            for subnet in subnets:
+                if subnet in signs:
+                    continue
+                signs[subnet] = 1 if idx % 2 == 0 else -1
+                idx += 1
+        return signs
+
+    for cfg_path in configs_dir.glob("material_config_*.json"):
+        mat = cfg_path.stem.replace("material_config_", "")
+        xi_value = xi_map.get(mat)
+        if xi_value is None:
+            continue
+        try:
+            data = json.loads(cfg_path.read_text())
+        except Exception:
+            continue
+        subnets = data.get("subnets", [])
+        if not subnets:
+            continue
+        xi_sign = derive_signs([str(s) for s in subnets])
+        data["xi"] = float(xi_value)
+        data["xi_sign"] = xi_sign
+        cfg_path.write_text(json.dumps(data, indent=2))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run full DOFT pipeline end-to-end.")
     parser.add_argument("--results-root", type=Path, required=True, help="Fingerprint results root (results_w*_p*)")
@@ -258,7 +304,36 @@ def main() -> None:
     else:
         materials = available_materials
 
-    # 2) Run simulator per material
+    # 2) Structural noise computation (needed for xi injection)
+    noise_csv = noise_dir / "structural_noise_summary.csv"
+    noise_json = noise_dir / "structural_noise_values.json"
+    xi_map = {}
+    if not args.skip_noise:
+        noise_cmd = [
+            "python3",
+            "src/compute_structural_noise.py",
+            "--materials-csv",
+            str(args.materials_csv),
+            "--output-csv",
+            str(noise_csv),
+            "--output-json",
+            str(noise_json),
+        ]
+        if args.fit_noise_by_category:
+            noise_cmd.append("--fit-by-category")
+        if materials:
+            noise_cmd += ["--materials", *materials]
+        run_cmd(noise_cmd, cwd=Path("."))
+        if noise_json.exists():
+            import json as _json
+
+            xi_map = _json.loads(noise_json.read_text())
+
+    # Inject xi/xip signs into material configs
+    if xi_map:
+        inject_xi_into_configs(configs_dir, xi_map)
+
+    # 3) Run simulator per material
     if not args.skip_simulator:
         for mat in materials:
             config_path = configs_dir / f"material_config_{mat}.json"

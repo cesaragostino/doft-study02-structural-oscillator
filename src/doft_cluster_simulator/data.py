@@ -142,6 +142,8 @@ class MaterialConfig:
     material: str
     subnets: List[str]
     anchors: Dict[str, Dict[str, float]]
+    xi: Optional[float] = None
+    xi_sign: Dict[str, int] = field(default_factory=dict)
 
     @classmethod
     def from_file(cls, path: Path) -> "MaterialConfig":
@@ -152,7 +154,20 @@ class MaterialConfig:
         raw_anchors = data.get("anchors", {})
         for subnet, anchor_data in raw_anchors.items():
             anchors[subnet] = {key: float(value) for key, value in anchor_data.items()}
-        return cls(material=material, subnets=subnets, anchors=anchors)
+        xi_value = data.get("xi")
+        if isinstance(xi_value, (int, float)) and math.isfinite(xi_value):
+            xi = float(xi_value)
+        else:
+            xi = None
+        xi_sign = {}
+        raw_sign = data.get("xi_sign", {})
+        if isinstance(raw_sign, dict):
+            for key, val in raw_sign.items():
+                try:
+                    xi_sign[str(key)] = int(val)
+                except Exception:
+                    continue
+        return cls(material=material, subnets=subnets, anchors=anchors, xi=xi, xi_sign=xi_sign)
 
 
 @dataclass

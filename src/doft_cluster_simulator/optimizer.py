@@ -32,6 +32,8 @@ class SubnetOptimizer:
         rng: random.Random,
         anchor: Optional[float],
         huber_delta: Optional[float],
+        xi_value: Optional[float],
+        xi_sign: int,
     ) -> None:
         self.simulator = simulator
         self.weights = weights
@@ -40,6 +42,8 @@ class SubnetOptimizer:
         self.rng = rng
         self.anchor = anchor
         self.huber_delta = huber_delta
+        self.xi_value = xi_value
+        self.xi_sign = xi_sign
 
     def optimise(self, target: SubnetTarget) -> OptimizationResult:
         best_params: Optional[SubnetParameters] = None
@@ -77,6 +81,8 @@ class SubnetOptimizer:
             weights=self.weights,
             anchor_value=self.anchor,
             huber_delta=self.huber_delta,
+            xi_value=self.xi_value,
+            xi_sign=self.xi_sign,
         )
         return loss, simulation_result
 

@@ -41,6 +41,8 @@ class SimulationEngine:
             if target is None:
                 raise KeyError(f"Missing target for subnet '{subnet_name}'")
             anchor = self._lookup_anchor(subnet_name)
+            xi_value = self.config.xi
+            xi_sign = self.config.xi_sign.get(subnet_name, 0)
             optimizer = SubnetOptimizer(
                 simulator=self.simulator,
                 weights=self.weights,
@@ -49,6 +51,8 @@ class SimulationEngine:
                 rng=self.rng,
                 anchor=anchor,
                 huber_delta=self.huber_delta,
+                xi_value=xi_value,
+                xi_sign=xi_sign,
             )
             result = optimizer.optimise(target)
             subnet_results[subnet_name] = SubnetSimulation(

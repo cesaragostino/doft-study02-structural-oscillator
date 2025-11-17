@@ -27,6 +27,7 @@ What it does:
 - Runs the simulator per material under `<output-root>/runs/<material>/`.
 - Computes structural noise summary/JSON under `<output-root>/structural_noise/`.
 - Produces a digest with simulator and structural-noise summaries under `<output-root>/digest/` (CSV + XLSX).
+- Injects structural-noise amplitude (`xi`) and per-subnet signs (`xi_sign`) into each material config before running the simulator.
 
 Notes:
 - `--eta` is auto-resolved inside `src/run_all_pipeline.py` from the `--results-root` (expects `calibration_metadata_calib_{tag}.json` in the calib/ folder).

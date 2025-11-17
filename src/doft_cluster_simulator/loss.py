@@ -42,6 +42,8 @@ def compute_subnet_loss(
     weights: LossWeights,
     anchor_value: Optional[float],
     huber_delta: Optional[float] = None,
+    xi_value: Optional[float] = None,
+    xi_sign: int = 0,
 ) -> LossBreakdown:
     """Compute the weighted loss for a subnet."""
 
@@ -69,7 +71,10 @@ def compute_subnet_loss(
 
     residual_loss = 0.0
     if target.residual_exp is not None:
-        diff_r = simulation.residual_sim - target.residual_exp
+        residual_adjusted = simulation.residual_sim
+        if xi_value is not None:
+            residual_adjusted = residual_adjusted + (xi_sign or 0) * xi_value
+        diff_r = residual_adjusted - target.residual_exp
         residual_loss = _loss_term(diff_r) * weights.w_r
 
     anchor_loss = 0.0
