@@ -1,0 +1,55 @@
+.DS_Store
+**/.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+
+env/
+venv/
+.venv/
+env*/          # en caso de variaciones
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pdb
+
+results/
+runs/
+outputs/
+*.csv
+*.png
+*.log
+*.out
+*.dat
+
+
+*.json
+
+#  ❗ PERMITIR JSON EN /configs (muy útil para parámetros)
+!configs/
+!configs/*.json
+
+.vscode/
+.idea/
+.spyproject/
+
+
+.ipynb_checkpoints/
+*.ipynb~
+
+*.bak
+*.tmp
+*~
+*.swp
+*.swo
+
+# archivos temporales de macOS Spotlight
+.Spotlight-V100
+.Trashes
+
+# archivos de sincronización
+.DS_Store?
+
+doft-study01-superconductors-zenodo-v1/

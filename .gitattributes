@@ -1,0 +1,55 @@
+
+* text=auto eol=lf
+
+*.py text
+*.md text
+*.json text
+*.yaml text
+*.yml text
+*.toml text
+*.txt text
+*.csv binary
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.bmp binary
+*.tif binary
+*.tiff binary
+
+*.npz binary
+*.npy binary
+*.h5 binary
+*.hdf5 binary
+
+*.bin binary
+*.dat binary
+*.out binary
+*.pkl binary
+*.pickle binary
+
+*.ipynb -diff
+*.ipynb binary
+
+*.log text
+*.err text
+*.tmp text
+*.swp text
+*.swo text
+
+*.pdf binary
+*.doc binary
+*.docx binary
+*.xls binary
+*.xlsx binary
+*.ppt binary
+*.pptx binary
+
+*.sh text eol=lf
+*.bash text eol=lf
+
+.DS_Store binary
+
+data/raw/*.csv binary
+data/processed/*.csv binary
