@@ -2,176 +2,182 @@
 
 ### Goal
 
-Simular materiales con subredes (σ, π, modos ópticos/acústicos, 0–10 bar) usando un modelo minimalista de osciladores de fase acoplados que reproduzca los observables de tu pipeline:
+Simulate materials with subnetworks (σ, π, optical/acoustic modes, 0–10 bar) using a minimalist model of coupled phase oscillators that reproduces the observables of your pipeline:
 
-- **Fingerprint entero:** exponentes `{exp_a_2, exp_b_3, exp_c_5, exp_d_7}`
-- **Fingerprint racional:** `q`
-- **Contraste de subred:** `C_AB` (p. ej. σ vs π, 0 vs 10 bar, La-acous vs H-optic)
-- **Residuo log:** `residual = log(R_corr_eta) - log(prime_value)`
+* **Integer fingerprint:** exponents `{exp_a_2, exp_b_3, exp_c_5, exp_d_7}`
+* **Rational fingerprint:** `q`
+* **Subnetwork contrast:** `C_AB` (e.g. σ vs π, 0 vs 10 bar, La-acous vs H-optic)
+* **Log residual:** `residual = log(R_corr_eta) - log(prime_value)`
 
-> Idea práctica: calibrar con un material/subred y predecir otro manteniendo la estructura discreta DOFT (primos activos) y variando sólo parámetros continuos (acoples, dispersión, ruido, presión).
+> Practical idea: calibrate with one material/subnetwork and predict another while keeping the discrete DOFT structure (active primes) fixed and varying only continuous parameters (couplings, dispersion, noise, pressure).
 
 ---
 
-## 1) Modelo dinámico
+## 1) Dynamical model
 
-### 1.1 Ecuación (Kuramoto con sesgo discreto)
+### 1.1 Equation (Kuramoto with discrete bias)
 
-\[
+[
 \dot{\theta_i} = \omega_i + \sum_j K_{ij}\sin(\theta_j - \theta_i) + \xi_i(t)
-\]
+]
 
-Donde:
+Where:
 
-- $\theta_i$: fase  
-- $\omega_i$: frecuencia natural  
-- $K_{ij}$: acoples  
-- $\xi_i$: ruido blanco ($\sigma_\mathrm{noise}^2$)
-
----
-
-### 1.2 Sesgo discreto DOFT (rejilla primo-estructurada)
-
-Para cada subred $S$:
-
-\[
-\omega(S)^* = \Omega_0 \cdot \prod_{p \in \{2,3,5,7\}} p^{e_{S,p}}, \qquad \omega_i = \omega(S)^*(1+\delta_i), \quad \delta_i \sim N(0, \sigma_\omega^2)
-\]
-
-Los exponentes $e_{S,p}$ vienen del fingerprint entero empírico.  
-$\sigma_\omega$, $K$ y $\sigma_\mathrm{noise}$ controlan el grado de lock.
+* $\theta_i$: phase
+* $\omega_i$: natural frequency
+* $K_{ij}$: couplings
+* $\xi_i$: white noise ($\sigma_\mathrm{noise}^2$)
 
 ---
 
-### 1.3 Capas y subredes
+### 1.2 DOFT discrete bias (prime-structured grid)
 
-- **Capas:** 1–2 (opcional 3) para jerarquía simple (basta para MgB₂ / FeSe / LaH₁₀ / He-3 / He-4)
-- **Subredes:** σ, π, “La-acous”, “H1-optic”, “H2-optic”, o “0/10-bar”
+For each subnetwork $S$:
 
-**Parámetros:**
-- $K_\mathrm{intra}(S)$  
-- $K_\mathrm{inter}(S_1, S_2)$  
-- Tamaño $N_S$  
-- Dispersión $\sigma_\omega(S)$
+[
+\omega(S)^* = \Omega_0 \cdot \prod_{p \in {2,3,5,7}} p^{e_{S,p}}, \qquad \omega_i = \omega(S)^*(1+\delta_i), \quad \delta_i \sim N(0, \sigma_\omega^2)
+]
 
----
-
-## 2) Observables (compatibles con tu pipeline)
-
-- **Espectro por subred:** FFT de $\langle e^{i\theta} \rangle$ → picos $\{\hat{\omega}^k\}$
-- **Fingerprint entero:** mapear $\hat{\omega}^k$ a la rejilla DOFT → `{exp_a_2, ..., exp_d_7}`
-- **Fingerprint racional:** `q`
-- **Contraste:** `C_AB` (σ vs π, 0 vs 10 bar, etc.)
-- **Residuo log:** `log(R_corr_eta) − log(prime_value)`
-
-Exportar CSVs con el mismo formato que tu pipeline.
+The exponents $e_{S,p}$ come from the empirical integer fingerprint.
+$\sigma_\omega$, $K$ and $\sigma_\mathrm{noise}$ control the degree of locking.
 
 ---
 
-## 3) Parametrización empírica (semillas por material)
+### 1.3 Layers and subnetworks
+
+* **Layers:** 1–2 (optionally 3) for a simple hierarchy (enough for MgB₂ / FeSe / LaH₁₀ / He-3 / He-4)
+* **Subnetworks:** σ, π, “La-acous”, “H1-optic”, “H2-optic”, or “0/10-bar”
+
+**Parameters:**
+
+* $K_\mathrm{intra}(S)$
+* $K_\mathrm{inter}(S_1, S_2)$
+* Size $N_S$
+* Dispersion $\sigma_\omega(S)$
+
+---
+
+## 2) Observables (compatible with your pipeline)
+
+* **Spectrum per subnetwork:** FFT of $\langle e^{i\theta} \rangle$ → peaks ${\hat{\omega}^k}$
+* **Integer fingerprint:** map $\hat{\omega}^k$ to the DOFT grid → `{exp_a_2, ..., exp_d_7}`
+* **Rational fingerprint:** `q`
+* **Contrast:** `C_AB` (σ vs π, 0 vs 10 bar, etc.)
+* **Log residual:** `log(R_corr_eta) − log(prime_value)`
+
+Export CSVs with the same format as your pipeline.
+
+---
+
+## 3) Empirical parametrization (seeds per material)
 
 ### MgB₂ (σ vs π)
-- Hechos: `C_AB ≈ 1.5897`, σ ≠ π, residuo bajo.
-- Setup: 2 capas (opcional), subredes σ y π con enteros fijados por tus promedios.  
-  Ajustar $K_\mathrm{inter}$ a `C_AB≈1.59`; $\sigma_\omega$ bajo.
-- Validación: calibrar σ → predecir π manteniendo primos; comprobar CIs de fingerprints/q y `C_AB`.
+
+* Facts: `C_AB ≈ 1.5897`, σ ≠ π, low residual.
+* Setup: 2 layers (optional), subnetworks σ and π with integers fixed by your averages.
+  Adjust $K_\mathrm{inter}$ to `C_AB≈1.59`; low $\sigma_\omega$.
+* Validation: calibrate σ → predict π while keeping primes fixed; check CIs of fingerprints/q and `C_AB`.
 
 ### FeSe (σ ≈ π)
-- Hecho: `C_AB ≈ 0`
-- Setup: misma rejilla DOFT o $K_\mathrm{inter}$ alto + $\sigma_\omega$ algo mayor para colapsar en un patrón común.
-- Chequeo: residuo y q similares, diferencias < bandas.
+
+* Fact: `C_AB ≈ 0`
+* Setup: same DOFT grid or high $K_\mathrm{inter}$ + somewhat larger $\sigma_\omega$ to collapse into a common pattern.
+* Check: similar residual and q, differences < bands.
 
 ### LaH₁₀ (La-acous, H1-optic, H2-optic)
-- Anclas X: 1.28, 3.80, 5.80.
-- Setup: 3 subredes con enteros consistentes con fingerprints.  
-  Ajustar $K_\mathrm{inter}$ para el par que compare el pipeline.  
-  $\sigma_\omega$ algo mayor en La-acous si hace falta.
 
-### Superfluidos (He-4 / He-3 B)
-- **He-4:** 1 capa, 1 subred por presión (1 vs 10 bar).  
-  Presión $P$ cambia $\omega^*$ sin activar nuevos primos; residuo bajo; q estable (~1–3.7).  
-- **He-3 B:** 0 vs 10 bar con gran `C_AB` (~195). Parametrizar $\omega^*$ distinto o $K_\mathrm{inter}$ condicionado.
+* X anchors: 1.28, 3.80, 5.80.
+* Setup: 3 subnetworks with integers consistent with fingerprints.
+  Adjust $K_\mathrm{inter}$ for the pair compared by the pipeline.
+  Slightly larger $\sigma_\omega$ in La-acous if needed.
 
----
+### Superfluids (He-4 / He-3 B)
 
-## 4) Calibración y validación
-
-### 4.1 Calibración mínima
-
-Fijar enteros $\{e_{2,3,5,7}\}$ por subred con promedios bootstrap actuales.  
-Elegir $\Omega_0$ para alinear escala (X/frecuencias).  
-Ajustar $K_\mathrm{intra}$, $K_\mathrm{inter}$, $\sigma_\omega$, $\sigma_\mathrm{noise}$ minimizando:
-
-\[
-L = w_1 \|e_\mathrm{sim} - e_\mathrm{exp}\|_1 + w_2 |q_\mathrm{sim} - q_\mathrm{exp}| + w_3 |C_{AB}^{sim} - C_{AB}^{exp}| + w_4 RMSE(\text{residuos})
-\]
-
-### 4.2 Falsación
-
-- **Hold-out:** σ→π (MgB₂), 0→10 bar (He-4/He-3), H1→H2 (LaH₁₀)
-- **Invariancia de primos bajo P:** si aparecen nuevos, hipótesis falla.
-- **Estadística:** 20–50 seeds; medias y CIs de {enteros, q, C_AB, residuo}.
-- **Sensibilidad:** barrer $K_\mathrm{inter}$ y $\sigma_\omega$; buscar zona donde C_AB y residuos coincidan con bandas empíricas.
+* **He-4:** 1 layer, 1 subnetwork per pressure (1 vs 10 bar).
+  Pressure $P$ shifts $\omega^*$ without activating new primes; low residual; q stable (~1–3.7).
+* **He-3 B:** 0 vs 10 bar with large `C_AB` (~195). Parametrize a different $\omega^*$ or a conditioned $K_\mathrm{inter}$.
 
 ---
 
-## 5) Defaults sugeridos
+## 4) Calibration and validation
 
-| Parámetro | MgB₂ | FeSe | LaH₁₀ (por subred) | He-4 (1/10 bar) | He-3 B (0/10 bar) |
-|------------|-------|------|------------------|-----------------|-------------------|
-| Capas | 2 | 1–2 | 2 | 1 | 1 |
-| N/subred | 200 | 200 | 150 | 200 | 200 |
-| $K_{intra}$ | 0.6 | 0.6 | 0.5 | 0.5 | 0.5 |
-| $K_{inter}$ | 0.15–0.25 (C_AB≈1.59) | 0.3–0.5 (C_AB≈0) | 0.05–0.2 | 0.05–0.1 | 0.1–0.2 |
-| $\sigma_\omega$ | 0.01–0.02 | 0.02–0.04 | 0.02–0.05 | 0.005–0.02 | 0.01–0.03 |
-| $\sigma_{noise}$ | 1e-3 | 2e-3 | 2e-3 | 5e-4 | 1e-3 |
-| $\Omega_0$ | fija (4.1) | fija | fija por subred | fija por P | fija por cond. |
+### 4.1 Minimal calibration
 
-**Reglas rápidas:**
-- ↑ $K_{inter}$ → igualiza subredes (↓ C_AB)
-- ↑ $\sigma_\omega$ → ensancha picos (↑ residuo)
+Fix integers ${e_{2,3,5,7}}$ per subnetwork using current bootstrap averages.
+Choose $\Omega_0$ to align the scale (X/frequencies).
+Tune $K_\mathrm{intra}$, $K_\mathrm{inter}$, $\sigma_\omega$, $\sigma_\mathrm{noise}$ by minimizing:
 
----
+[
+L = w_1 |e_\mathrm{sim} - e_\mathrm{exp}|*1 + w_2 |q*\mathrm{sim} - q_\mathrm{exp}| + w_3 |C_{AB}^{sim} - C_{AB}^{exp}| + w_4 RMSE(\text{residuals})
+]
 
-## 6) Flujo computacional
+### 4.2 Falsification
 
-- **Config (YAML/JSON):** capas, subredes, `{e_{2,3,5,7}}`, $K$, $N$, $\sigma$, protocolo $P$  
-- **Integración:** Euler / RK4, $10^4$ pasos, $\Delta t$ chico  
-- **Extracción:** FFT por subred → picos → CSV compatible  
-- **Pipeline actual:** fingerprints, q, C_AB, residuo, bootstrap, tests  
-- **Comparador:** tablas de error sim vs empírico  
-- **Ajuste:** grid search + descenso local de $L$
+* **Hold-out:** σ→π (MgB₂), 0→10 bar (He-4/He-3), H1→H2 (LaH₁₀)
+* **Prime invariance under P:** if new ones appear, the hypothesis fails.
+* **Statistics:** 20–50 seeds; means and CIs of {integers, q, C_AB, residual}.
+* **Sensitivity:** sweep $K_\mathrm{inter}$ and $\sigma_\omega$; search for the region where C_AB and residuals match the empirical bands.
 
 ---
 
-## 7) Ejercicios de predicción
+## 5) Suggested defaults
 
-- **MgB₂ σ→π:** mantener primos; C_AB≈1.59; enteros y q dentro de CIs.  
-- **He-4 0→10 bar:** mismos primos; deriva suave; q estable; residuo bajo.  
-- **LaH₁₀ H1→H2:** mismos primos; ajustar $K_{inter}$; respetar saltos.  
-- **FeSe σ⇄π:** $K_{inter}$ alto ⇒ C_AB→0 y fingerprints coincidentes.
+| Parameter        | MgB₂                  | FeSe             | LaH₁₀ (per subnetwork) | He-4 (1/10 bar) | He-3 B (0/10 bar) |
+| ---------------- | --------------------- | ---------------- | ---------------------- | --------------- | ----------------- |
+| Layers           | 2                     | 1–2              | 2                      | 1               | 1                 |
+| N/subnetwork     | 200                   | 200              | 150                    | 200             | 200               |
+| $K_{intra}$      | 0.6                   | 0.6              | 0.5                    | 0.5             | 0.5               |
+| $K_{inter}$      | 0.15–0.25 (C_AB≈1.59) | 0.3–0.5 (C_AB≈0) | 0.05–0.2               | 0.05–0.1        | 0.1–0.2           |
+| $\sigma_\omega$  | 0.01–0.02             | 0.02–0.04        | 0.02–0.05              | 0.005–0.02      | 0.01–0.03         |
+| $\sigma_{noise}$ | 1e-3                  | 2e-3             | 2e-3                   | 5e-4            | 1e-3              |
+| $\Omega_0$       | fixed (4.1)           | fixed            | fixed per subnetwork   | fixed per P     | fixed per cond.   |
 
----
+**Quick rules:**
 
-## 8) Qué sería publicable (fuerte)
-
-- Predicciones cruzadas (subred/condición) sin recalibrar primos, con CIs simuladas que solapen las empíricas.  
-- Estabilidad de q por familia (p. ej. High-Pressure ~ 5.85 ± 0.19) sólo variando parámetros continuos.  
-- Residuos por familia en bandas (MgB₂ y superfluidos).  
-- Tests (KW, MWU, KS) sim vs real con p-values y tamaños de efecto consistentes.
-
----
-
-## 9) Notas prácticas
-
-- Empezar con 2 capas; agregar 3 sólo si no alcanza para clavar C_AB y residuos.  
-- Superfluidos: conservar set de primos y mover $\omega^*$ con presión.  
-- LaH₁₀: especificar explícitamente qué par de subredes se compara (el pipeline a veces ignora la tercera).
+* ↑ $K_{inter}$ → equalizes subnetworks (↓ C_AB)
+* ↑ $\sigma_\omega$ → broadens peaks (↑ residual)
 
 ---
 
-### Resumen corto
+## 6) Computational flow
 
-La rejilla DOFT (primos 2–3–5–7) fija la estructura discreta; los acoples y dispersión ajustan el lock observado.  
-Con 1–2 capas + subredes se puede replicar q, C_AB, enteros y residuo sin “caos perfecto”.  
-**Métrica clave:** mantener primos y ajustar continuo; si pide nuevos primos, la hipótesis falla (y eso también es resultado).
+* **Config (YAML/JSON):** layers, subnetworks, `{e_{2,3,5,7}}`, $K$, $N$, $\sigma$, protocol $P$
+* **Integration:** Euler / RK4, $10^4$ steps, small $\Delta t$
+* **Extraction:** FFT per subnetwork → peaks → CSV compatible
+* **Current pipeline:** fingerprints, q, C_AB, residual, bootstrap, tests
+* **Comparator:** error tables sim vs empirical
+* **Tuning:** grid search + local descent of $L$
+
+---
+
+## 7) Prediction exercises
+
+* **MgB₂ σ→π:** keep primes; C_AB≈1.59; integers and q within CIs.
+* **He-4 0→10 bar:** same primes; smooth drift; q stable; low residual.
+* **LaH₁₀ H1→H2:** same primes; tune $K_{inter}$; respect jumps.
+* **FeSe σ⇄π:** high $K_{inter}$ ⇒ C_AB→0 and matching fingerprints.
+
+---
+
+## 8) What would be publishable (strong)
+
+* Cross predictions (subnetwork/condition) without recalibrating primes, with simulated CIs overlapping the empirical ones.
+* q stability by family (e.g. High-Pressure ~ 5.85 ± 0.19) changing only continuous parameters.
+* Residuals by family in bands (MgB₂ and superfluids).
+* Tests (KW, MWU, KS) sim vs real with consistent p-values and effect sizes.
+
+---
+
+## 9) Practical notes
+
+* Start with 2 layers; add a 3rd only if needed to nail C_AB and residuals.
+* Superfluids: keep the set of primes and move $\omega^*$ with pressure.
+* LaH₁₀: explicitly specify which pair of subnetworks is being compared (the pipeline sometimes ignores the third one).
+
+---
+
+### Short summary
+
+The DOFT grid (primes 2–3–5–7) fixes the discrete structure; the couplings and dispersion adjust the observed locking.
+With 1–2 layers + subnetworks you can replicate q, C_AB, integers and residual without “perfect chaos”.
+**Key metric:** keep primes fixed and tune the continuous part; if it demands new primes, the hypothesis fails (and that is also a result).
