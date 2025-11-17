@@ -3,10 +3,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from scripts.doft_cluster_simulator.data import LossWeights, MaterialConfig, SubnetParameters, SubnetTarget, TargetDataset
-from scripts.doft_cluster_simulator.engine import SimulationEngine
-from scripts.doft_cluster_simulator.loss import compute_subnet_loss
-from scripts.doft_cluster_simulator.model import SimulationResult
+from src.doft_cluster_simulator.data import LossWeights, MaterialConfig, SubnetParameters, SubnetTarget, TargetDataset
+from src.doft_cluster_simulator.engine import SimulationEngine
+from src.doft_cluster_simulator.loss import compute_subnet_loss
+from src.doft_cluster_simulator.model import SimulationResult
 
 
 def test_target_dataset_handles_missing_values(tmp_path: Path) -> None:
@@ -61,4 +61,3 @@ def test_engine_runs_end_to_end(tmp_path: Path) -> None:
     assert (out_dir / "simulation_results.csv").exists()
     assert (out_dir / "report.md").exists()
     assert (out_dir / "manifest.json").exists()
-

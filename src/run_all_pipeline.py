@@ -2,11 +2,10 @@
 
 Example:
 
-python3 scripts/run_all_pipeline.py \
+python3 src/run_all_pipeline.py \
   --results-root data/raw/fingerprint-run2-v6/results_w800_p7919 \
   --tag fp_kappa_w800_p7919 \
   --materials Al Hf Mo Nb NbN Re Ta Ti V Zr \
-  --eta data/raw/fingerprint-run2-v6/results_w800_p7919/calib/calibration_metadata_calib_w800_p7919.json \
   --output-root outputs/run_w800_p7919 \
   --bounds ratios=-0.25,0.25 deltas=-0.35,0.35 f0=12,500 \
   --huber-delta 0.02 \
@@ -43,13 +42,20 @@ def detect_materials_from_configs(config_dir: Path) -> List[str]:
     return sorted(mats)
 
 
+def default_eta_path(results_root: Path, tag: str) -> Path:
+    """Infer eta path from results_root and tag."""
+    calib_dir = results_root / "calib"
+    filename = f"calibration_metadata_calib_{tag.replace('fp_', '')}.json"
+    return calib_dir / filename
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run full DOFT pipeline end-to-end.")
     parser.add_argument("--results-root", type=Path, required=True, help="Fingerprint results root (results_w*_p*)")
     parser.add_argument("--tag", required=True, help="Tag used in CSV filenames, e.g. fp_kappa_w800_p7919")
     parser.add_argument("--materials", nargs="*", help="Materials to process; if omitted, auto-detect from generated configs")
-    parser.add_argument("--eta", type=Path, required=True, help="Calibration metadata JSON with eta")
-    parser.add_argument("--output-root", type=Path, default=Path("outputs/run_all"), help="Root folder for all artefacts")
+    parser.add_argument("--eta", type=Path, help="Calibration metadata JSON with eta (auto-resolved if omitted)")
+    parser.add_argument("--output-root", type=Path, default=Path("outputs/run_all"), help="Root folder for all artifacts")
     parser.add_argument("--q-strategy-single", choices=["gating", "proxy"], default="gating")
     parser.add_argument("--bounds", nargs="*", help="Bounds override passed to simulator (ratios=.. deltas=.. f0=..)")
     parser.add_argument("--huber-delta", type=float, default=None)
@@ -68,8 +74,10 @@ def main() -> None:
     noise_dir = output_root / "structural_noise"
     configs_dir.mkdir(parents=True, exist_ok=True)
     runs_dir.mkdir(parents=True, exist_ok=True)
-    if not args.skip-noise:
+    if not args.skip_noise:
         noise_dir.mkdir(parents=True, exist_ok=True)
+
+    eta_path = args.eta if args.eta else default_eta_path(args.results_root, args.tag)
 
     # 1) Generate DOFT configs
     gen_cmd = [
@@ -84,7 +92,7 @@ def main() -> None:
         "--q-strategy-single",
         args.q_strategy_single,
         "--eta",
-        str(args.eta),
+        str(eta_path),
     ]
     if args.materials:
         gen_cmd += ["--materials", *args.materials]
@@ -103,7 +111,7 @@ def main() -> None:
             sim_cmd = [
                 "python3",
                 "-m",
-                "scripts.doft_cluster_simulator.cli",
+                "src.doft_cluster_simulator.cli",
                 "--config",
                 str(config_path),
                 "--targets",
@@ -131,7 +139,7 @@ def main() -> None:
         noise_json = noise_dir / "structural_noise_values.json"
         noise_cmd = [
             "python3",
-            "scripts/compute_structural_noise.py",
+                "src/compute_structural_noise.py",
             "--materials-csv",
             str(args.materials_csv),
             "--output-csv",
