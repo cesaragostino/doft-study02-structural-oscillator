@@ -115,10 +115,25 @@ def copy_noise_digest(noise_csv: Path, digest_dir: Path) -> None:
         pass
 
 
-def build_config_digest(configs_dir: Path, digest_dir: Path) -> None:
+def build_config_digest(configs_dir: Path, digest_dir: Path, materials_csv: Path) -> None:
     """Aggregate per-material fingerprint targets/anchors into a single CSV/XLSX."""
     import json
     import pandas as pd
+
+    meta_by_key = {}
+    if materials_csv.exists():
+        df_meta = pd.read_csv(materials_csv)
+        for row in df_meta.itertuples():
+            name = str(getattr(row, "name"))
+            subnet = str(getattr(row, "sub_network")) if hasattr(row, "sub_network") else None
+            key = (name, subnet) if subnet is not None else (name, "")
+            meta_by_key[key] = {
+                "category": getattr(row, "category", None),
+                "Tc_K": getattr(row, "Tc_K", None),
+                "Gap_meV": getattr(row, "Gap_meV", None),
+                "ThetaD_K": getattr(row, "ThetaD_K", None),
+                "EF_eV": getattr(row, "EF_eV", None),
+            }
 
     rows = []
     for gt_path in configs_dir.glob("ground_truth_targets_*.json"):
@@ -138,10 +153,17 @@ def build_config_digest(configs_dir: Path, digest_dir: Path) -> None:
             if subnet.startswith(prefix):
                 subnet = subnet[len(prefix) :]
             e_list = val.get("e_exp") or [None, None, None, None]
+
+            meta = meta_by_key.get((mat, subnet)) or meta_by_key.get((mat, "")) or {}
             rows.append(
                 {
                     "material": mat,
                     "subnet": subnet,
+                    "category": meta.get("category"),
+                    "Tc_K": meta.get("Tc_K"),
+                    "Gap_meV": meta.get("Gap_meV"),
+                    "ThetaD_K": meta.get("ThetaD_K"),
+                    "EF_eV": meta.get("EF_eV"),
                     "e2": e_list[0],
                     "e3": e_list[1],
                     "e5": e_list[2],
@@ -150,7 +172,6 @@ def build_config_digest(configs_dir: Path, digest_dir: Path) -> None:
                     "residual_exp": val.get("residual_exp"),
                     "anchor_f0": anchors.get(subnet, {}).get("f0"),
                     "anchor_X": anchors.get(subnet, {}).get("X"),
-                    "category": val.get("category"),
                 }
             )
 
@@ -293,7 +314,7 @@ def main() -> None:
         run_cmd(noise_cmd, cwd=Path("."))
 
     # 4) Build digests for configs, simulator, and structural noise
-    build_config_digest(configs_dir, digest_dir)
+    build_config_digest(configs_dir, digest_dir, args.materials_csv)
     if not args.skip_simulator:
         build_sim_digest(runs_dir, digest_dir)
     if not args.skip_noise:
