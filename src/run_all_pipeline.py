@@ -180,11 +180,12 @@ def main() -> None:
         gen_cmd += ["--materials", *material_list]
     run_cmd(gen_cmd, cwd=Path("."))
 
-    # Discover materials if not provided
+    # Discover materials based on generated configs to avoid missing targets
+    available_materials = detect_materials_from_configs(configs_dir)
     if material_list is not None:
-        materials = material_list
+        materials = [m for m in material_list if m in available_materials]
     else:
-        materials = detect_materials_from_configs(configs_dir)
+        materials = available_materials
 
     # 2) Run simulator per material
     if not args.skip_simulator:
@@ -192,6 +193,9 @@ def main() -> None:
             config_path = configs_dir / f"material_config_{mat}.json"
             targets_path = configs_dir / f"ground_truth_targets_{mat}.json"
             weights_path = configs_dir / f"loss_weights_default_{mat}.json"
+            if not config_path.exists() or not targets_path.exists() or not weights_path.exists():
+                print(f"[WARN] Missing files for {mat}; skipping simulator run")
+                continue
             outdir = runs_dir / mat.lower()
             sim_cmd = [
                 "python3",

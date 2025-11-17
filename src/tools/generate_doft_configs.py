@@ -232,15 +232,18 @@ def main() -> None:
 
     for material in materials:
         material_rows = full_df[full_df["name"] == material]
-        subnets = sorted({str(s) for s in material_rows["sub_network"] if "vs" not in str(s)})
+        requested_subnets = sorted({str(s) for s in material_rows["sub_network"] if "vs" not in str(s)})
+        subnets: List[str] = []
         anchors = {}
         ground_truth = {}
         q_overrides: Dict[str, float] = {}
 
-        for subnet in subnets:
+        for subnet in requested_subnets:
             row = pick_fingerprint_row(full_df, material, subnet)
             if row is None:
+                print(f"[WARN] No fingerprint row for {material} / {subnet}; skipping subnet")
                 continue
+            subnets.append(subnet)
             key = f"{material}_{subnet}"
             q_value = None
             rational_rows = material_rows[
@@ -293,6 +296,9 @@ def main() -> None:
             "layers": {subnet: 1 for subnet in subnets},
             "eta": eta_value,
         }
+        if not subnets or not ground_truth:
+            print(f"[WARN] Skipping {material}: no valid subnets/targets found")
+            continue
         for contrast in material_contrasts:
             key = f"{material}_{contrast['A']}_vs_{contrast['B']}"
             ground_truth[key] = {"C_AB_exp": contrast["C_AB_exp"]}
