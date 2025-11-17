@@ -84,10 +84,12 @@ def parse_args() -> argparse.Namespace:
         help="How to handle q_exp for single-family materials when per-material q is missing",
     )
     parser.add_argument(
+        "--eta",
         "--eta-config",
+        dest="eta_config",
         type=Path,
-        default=Path("results/study_01_motherfreq_thermalshift/doft_config.json"),
-        help="Path to doft_config.json to read the global eta value",
+        default=None,
+        help="Path to calibration JSON file containing eta (supports old/new formats)",
     )
     parser.add_argument(
         "--constraints",
@@ -102,6 +104,33 @@ def parse_args() -> argparse.Namespace:
         help="Optional JSON string overriding the default loss weights",
     )
     return parser.parse_args()
+
+
+def _read_eta_value(path: Path, default: float) -> float:
+    """Load eta from either the legacy or the new calibration JSON format."""
+
+    if not path.exists():
+        return default
+
+    try:
+        data = json.loads(path.read_text())
+    except json.JSONDecodeError:
+        return default
+
+    # New format: {"eta": {"mean": ...}}
+    if isinstance(data, dict):
+        eta_block = data.get("eta")
+        if isinstance(eta_block, dict):
+            mean_value = eta_block.get("mean")
+            if isinstance(mean_value, (int, float)):
+                return float(mean_value)
+        # Legacy key
+        if "CALIBRATED_ETA" in data and isinstance(data["CALIBRATED_ETA"], (int, float)):
+            return float(data["CALIBRATED_ETA"])
+        # Fallback for direct scalar
+        if "eta" in data and isinstance(data["eta"], (int, float)):
+            return float(data["eta"])
+    return default
 
 
 def load_csv(root: Path, subdir: str, filename: str) -> pd.DataFrame:
@@ -191,9 +220,8 @@ def main() -> None:
 
     materials = collect_materials(full_df, args.materials)
     eta_value = DEFAULT_WEIGHTS["lambda_reg"]
-    if args.eta_config and Path(args.eta_config).exists():
-        eta_data = json.loads(Path(args.eta_config).read_text())
-        eta_value = float(eta_data.get("CALIBRATED_ETA", eta_value))
+    if args.eta_config:
+        eta_value = _read_eta_value(Path(args.eta_config), eta_value)
 
     constraints = json.loads(args.constraints) if args.constraints else DEFAULT_CONSTRAINTS
     weight_template = json.loads(args.weights) if args.weights else DEFAULT_WEIGHTS
@@ -257,7 +285,7 @@ def main() -> None:
 
         material_config = {
             "material": material,
-            "subnetworks": subnets,
+            "subnets": subnets,
             "anchors": anchors,
             "primes": {str(p): {"layer": 1} for p in PRIME_ORDER},
             "constraints": constraints,
@@ -265,6 +293,9 @@ def main() -> None:
             "layers": {subnet: 1 for subnet in subnets},
             "eta": eta_value,
         }
+        for contrast in material_contrasts:
+            key = f"{material}_{contrast['A']}_vs_{contrast['B']}"
+            ground_truth[key] = {"C_AB_exp": contrast["C_AB_exp"]}
         if material_contrasts:
             material_config["contrasts"] = material_contrasts
 
