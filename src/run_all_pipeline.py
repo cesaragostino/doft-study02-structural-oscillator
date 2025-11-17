@@ -115,6 +115,56 @@ def copy_noise_digest(noise_csv: Path, digest_dir: Path) -> None:
         pass
 
 
+def build_config_digest(configs_dir: Path, digest_dir: Path) -> None:
+    """Aggregate per-material fingerprint targets/anchors into a single CSV/XLSX."""
+    import json
+    import pandas as pd
+
+    rows = []
+    for gt_path in configs_dir.glob("ground_truth_targets_*.json"):
+        mat = gt_path.stem.replace("ground_truth_targets_", "")
+        cfg_path = configs_dir / f"material_config_{mat}.json"
+        anchors = {}
+        if cfg_path.exists():
+            cfg_data = json.loads(cfg_path.read_text())
+            anchors = cfg_data.get("anchors", {})
+
+        data = json.loads(gt_path.read_text())
+        for key, val in data.items():
+            if "_vs_" in key:
+                continue
+            subnet = key
+            prefix = f"{mat}_"
+            if subnet.startswith(prefix):
+                subnet = subnet[len(prefix) :]
+            e_list = val.get("e_exp") or [None, None, None, None]
+            rows.append(
+                {
+                    "material": mat,
+                    "subnet": subnet,
+                    "e2": e_list[0],
+                    "e3": e_list[1],
+                    "e5": e_list[2],
+                    "e7": e_list[3],
+                    "q_exp": val.get("q_exp"),
+                    "residual_exp": val.get("residual_exp"),
+                    "anchor_f0": anchors.get(subnet, {}).get("f0"),
+                    "anchor_X": anchors.get(subnet, {}).get("X"),
+                    "category": val.get("category"),
+                }
+            )
+
+    if not rows:
+        return
+    digest_dir.mkdir(parents=True, exist_ok=True)
+    df = pd.DataFrame(rows)
+    df.to_csv(digest_dir / "config_fingerprint_summary.csv", index=False)
+    try:
+        df.to_excel(digest_dir / "config_fingerprint_summary.xlsx", index=False)
+    except Exception:
+        pass
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run full DOFT pipeline end-to-end.")
     parser.add_argument("--results-root", type=Path, required=True, help="Fingerprint results root (results_w*_p*)")
@@ -242,7 +292,8 @@ def main() -> None:
             noise_cmd += ["--materials", *materials]
         run_cmd(noise_cmd, cwd=Path("."))
 
-    # 4) Build digests for simulator and structural noise
+    # 4) Build digests for configs, simulator, and structural noise
+    build_config_digest(configs_dir, digest_dir)
     if not args.skip_simulator:
         build_sim_digest(runs_dir, digest_dir)
     if not args.skip_noise:
