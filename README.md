@@ -42,3 +42,37 @@ Detalles del CLI:
 - `--anchor-weight` permite sobreescribir `w_anchor` rápido.
 
 Los resultados de cada corrida incluyen `best_params.json`, `simulation_results.csv`, `report.md` y `manifest.json`.
+
+## Calcular ruido estructural (N_mismatch, M_struct, ξ)
+
+```bash
+python3 scripts/compute_structural_noise.py \
+  --materials-csv data/raw/materials_clusters_real_v6.csv \
+  --output-csv outputs/structural_noise_summary.csv \
+  --output-json outputs/structural_noise_values.json \
+  --fit-by-category
+```
+
+Genera un CSV con `N_mismatch`, `M_struct` y `predicted_noise = ζ·N_mismatch` para materiales con >=2 subredes; el JSON mapea nombre → ξ (predicted_noise) para integrarlo en configuraciones si se desea.
+
+## Pipeline end-to-end (run_all)
+
+```bash
+python3 scripts/run_all_pipeline.py \
+  --results-root data/raw/fingerprint-run2-v6/results_w800_p7919 \
+  --tag fp_kappa_w800_p7919 \
+  --materials Al Hf Mo Nb NbN Re Ta Ti V Zr \
+  --eta data/raw/fingerprint-run2-v6/results_w800_p7919/calib/calibration_metadata_calib_w800_p7919.json \
+  --output-root outputs/run_w800_p7919 \
+  --bounds ratios=-0.25,0.25 deltas=-0.35,0.35 f0=12,500 \
+  --huber-delta 0.02 \
+  --max-evals 1200 \
+  --seed 123 \
+  --seed-sweep 5 \
+  --fit-noise-by-category
+```
+
+Esto genera:
+- Configs en `<output-root>/configs`
+- Corridas del simulador por material en `<output-root>/runs/<material>/`
+- Resumen y JSON de ruido estructural en `<output-root>/structural_noise/`
