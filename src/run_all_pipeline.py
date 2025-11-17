@@ -43,9 +43,14 @@ def detect_materials_from_configs(config_dir: Path) -> List[str]:
 
 
 def default_eta_path(results_root: Path, tag: str) -> Path:
-    """Infer eta path from results_root and tag."""
+    """Infer eta path from results_root and tag (strip fp_ and optional kappa_)."""
     calib_dir = results_root / "calib"
-    filename = f"calibration_metadata_calib_{tag.replace('fp_', '')}.json"
+    core = tag
+    if core.startswith("fp_"):
+        core = core[len("fp_") :]
+    if core.startswith("kappa_"):
+        core = core[len("kappa_") :]
+    filename = f"calibration_metadata_calib_{core}.json"
     return calib_dir / filename
 
 
@@ -145,6 +150,17 @@ def main() -> None:
 
     eta_path = args.eta if args.eta else default_eta_path(args.results_root, args.tag)
 
+    # Resolve materials before generating configs
+    materials_cli = args.materials or []
+    if "all" in materials_cli:
+        material_list = load_all_materials(args.materials_csv)
+        if not material_list:
+            material_list = None
+    elif materials_cli:
+        material_list = materials_cli
+    else:
+        material_list = None  # let generator detect
+
     # 1) Generate DOFT configs
     gen_cmd = [
         "python3",
@@ -160,16 +176,13 @@ def main() -> None:
         "--eta",
         str(eta_path),
     ]
-    if args.materials:
-        gen_cmd += ["--materials", *args.materials]
+    if material_list:
+        gen_cmd += ["--materials", *material_list]
     run_cmd(gen_cmd, cwd=Path("."))
 
     # Discover materials if not provided
-    materials_cli = args.materials or []
-    if "all" in materials_cli:
-        materials = load_all_materials(args.materials_csv)
-    elif materials_cli:
-        materials = materials_cli
+    if material_list is not None:
+        materials = material_list
     else:
         materials = detect_materials_from_configs(configs_dir)
 
