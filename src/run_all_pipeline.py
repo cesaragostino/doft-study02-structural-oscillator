@@ -49,11 +49,76 @@ def default_eta_path(results_root: Path, tag: str) -> Path:
     return calib_dir / filename
 
 
+def load_all_materials(materials_csv: Path) -> List[str]:
+    import pandas as pd
+
+    if not materials_csv.exists():
+        return []
+    df = pd.read_csv(materials_csv)
+    if "name" not in df.columns:
+        return []
+    return sorted(df["name"].dropna().astype(str).unique().tolist())
+
+
+def build_sim_digest(runs_dir: Path, digest_dir: Path) -> None:
+    import json
+    import pandas as pd
+
+    rows = []
+    for manifest_path in runs_dir.rglob("manifest.json"):
+        with manifest_path.open() as fh:
+            data = json.load(fh)
+        rows.append(
+            {
+                "material": data.get("material"),
+                "seed": data.get("seed"),
+                "max_evals": data.get("max_evals"),
+                "total_loss": data.get("total_loss"),
+                "weights_w_e": data.get("weights", {}).get("w_e"),
+                "weights_w_q": data.get("weights", {}).get("w_q"),
+                "weights_w_r": data.get("weights", {}).get("w_r"),
+                "weights_w_c": data.get("weights", {}).get("w_c"),
+                "weights_w_anchor": data.get("weights", {}).get("w_anchor"),
+                "huber_delta": data.get("extras", {}).get("huber_delta"),
+                "bounds": data.get("extras", {}).get("bounds"),
+                "seed_sweep": data.get("extras", {}).get("seed_sweep"),
+                "path": str(manifest_path.parent),
+            }
+        )
+    if not rows:
+        return
+    digest_dir.mkdir(parents=True, exist_ok=True)
+    df = pd.DataFrame(rows)
+    df.to_csv(digest_dir / "simulator_summary.csv", index=False)
+    try:
+        df.to_excel(digest_dir / "simulator_summary.xlsx", index=False)
+    except Exception:
+        pass
+
+
+def copy_noise_digest(noise_csv: Path, digest_dir: Path) -> None:
+    import pandas as pd
+
+    if not noise_csv.exists():
+        return
+    digest_dir.mkdir(parents=True, exist_ok=True)
+    df = pd.read_csv(noise_csv)
+    df.to_csv(digest_dir / "structural_noise_summary.csv", index=False)
+    try:
+        df.to_excel(digest_dir / "structural_noise_summary.xlsx", index=False)
+    except Exception:
+        pass
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run full DOFT pipeline end-to-end.")
     parser.add_argument("--results-root", type=Path, required=True, help="Fingerprint results root (results_w*_p*)")
     parser.add_argument("--tag", required=True, help="Tag used in CSV filenames, e.g. fp_kappa_w800_p7919")
-    parser.add_argument("--materials", nargs="*", help="Materials to process; if omitted, auto-detect from generated configs")
+    parser.add_argument(
+        "--materials",
+        nargs="*",
+        help="Materials to process; use 'all' to load every name from materials-csv; omit to auto-detect from generated configs",
+    )
     parser.add_argument("--eta", type=Path, help="Calibration metadata JSON with eta (auto-resolved if omitted)")
     parser.add_argument("--output-root", type=Path, default=Path("outputs/run_all"), help="Root folder for all artifacts")
     parser.add_argument("--q-strategy-single", choices=["gating", "proxy"], default="gating")
@@ -72,6 +137,7 @@ def main() -> None:
     configs_dir = output_root / "configs"
     runs_dir = output_root / "runs"
     noise_dir = output_root / "structural_noise"
+    digest_dir = output_root / "digest"
     configs_dir.mkdir(parents=True, exist_ok=True)
     runs_dir.mkdir(parents=True, exist_ok=True)
     if not args.skip_noise:
@@ -99,7 +165,13 @@ def main() -> None:
     run_cmd(gen_cmd, cwd=Path("."))
 
     # Discover materials if not provided
-    materials = args.materials or detect_materials_from_configs(configs_dir)
+    materials_cli = args.materials or []
+    if "all" in materials_cli:
+        materials = load_all_materials(args.materials_csv)
+    elif materials_cli:
+        materials = materials_cli
+    else:
+        materials = detect_materials_from_configs(configs_dir)
 
     # 2) Run simulator per material
     if not args.skip_simulator:
@@ -139,7 +211,7 @@ def main() -> None:
         noise_json = noise_dir / "structural_noise_values.json"
         noise_cmd = [
             "python3",
-                "src/compute_structural_noise.py",
+            "src/compute_structural_noise.py",
             "--materials-csv",
             str(args.materials_csv),
             "--output-csv",
@@ -152,6 +224,12 @@ def main() -> None:
         if materials:
             noise_cmd += ["--materials", *materials]
         run_cmd(noise_cmd, cwd=Path("."))
+
+    # 4) Build digests for simulator and structural noise
+    if not args.skip_simulator:
+        build_sim_digest(runs_dir, digest_dir)
+    if not args.skip_noise:
+        copy_noise_digest(noise_csv, digest_dir)
 
     print(f"Pipeline completed. Outputs under: {output_root}")
 

@@ -26,7 +26,9 @@ What it does:
 - Generates configs (`material_config_*.json`, `ground_truth_targets_*.json`, `loss_weights_default_*.json`) under `<output-root>/configs`.
 - Runs the simulator per material under `<output-root>/runs/<material>/`.
 - Computes structural noise summary/JSON under `<output-root>/structural_noise/`.
+- Produces a digest with simulator and structural-noise summaries under `<output-root>/digest/` (CSV + XLSX).
 
 Notes:
 - `--eta` is auto-resolved inside `src/run_all_pipeline.py` from the `--results-root` (expects `calibration_metadata_calib_{tag}.json` in the calib/ folder).
 - Bounds and Huber delta are forwarded to the simulator. Remove `--fit-noise-by-category` to use a single global ζ.
+- Use `--materials all` to process every material listed in `materials-csv`.
