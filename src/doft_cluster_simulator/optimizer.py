@@ -37,6 +37,7 @@ class SubnetOptimizer:
         xi_exp: Optional[dict],
         k_skin: float,
         base_delta_T: float = 0.0,
+        base_delta_space: float = 0.0,
     ) -> None:
         self.simulator = simulator
         self.weights = weights
@@ -50,6 +51,7 @@ class SubnetOptimizer:
         self.xi_exp = xi_exp or {}
         self.k_skin = k_skin
         self.base_delta_T = base_delta_T
+        self.base_delta_space = base_delta_space
 
     def optimise(self, target: SubnetTarget) -> OptimizationResult:
         best_params: Optional[SubnetParameters] = None
@@ -92,6 +94,7 @@ class SubnetOptimizer:
             xi_exp=self.xi_exp,
             k_skin=self.k_skin,
             delta_T=params.delta_T,
+            delta_space=params.delta_space,
         )
         return loss, simulation_result
 
@@ -103,7 +106,10 @@ class SubnetOptimizer:
         delta = {key: self.rng.uniform(*self.bounds.deltas) for key in DELTA_KEYS}
         layer_assignment = [self.rng.randint(1, L) for _ in PRIME_KEYS]
         delta_T = self.base_delta_T + self.rng.gauss(0.0, 0.01)
-        return SubnetParameters(L=L, f0=f0, ratios=ratios, delta=delta, layer_assignment=layer_assignment, delta_T=delta_T)
+        delta_space = self.base_delta_space + self.rng.gauss(0.0, 0.01)
+        return SubnetParameters(
+            L=L, f0=f0, ratios=ratios, delta=delta, layer_assignment=layer_assignment, delta_T=delta_T, delta_space=delta_space
+        )
 
     def _perturb(self, params: SubnetParameters) -> SubnetParameters:
         candidate = params.copy()
@@ -114,6 +120,7 @@ class SubnetOptimizer:
         for key in DELTA_KEYS:
             candidate.delta[key] = self._clamp(candidate.delta[key] + self.rng.gauss(0.0, 0.02), self.bounds.deltas)
         candidate.delta_T = candidate.delta_T + self.rng.gauss(0.0, 0.01)
+        candidate.delta_space = candidate.delta_space + self.rng.gauss(0.0, 0.01)
         candidate.layer_assignment = [
             max(1, min(candidate.L, layer + self.rng.choice([-1, 0, 1]))) for layer in candidate.layer_assignment
         ]

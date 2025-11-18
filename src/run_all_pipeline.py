@@ -73,12 +73,34 @@ def build_sim_digest(runs_dir: Path, digest_dir: Path) -> None:
     for manifest_path in runs_dir.rglob("manifest.json"):
         with manifest_path.open() as fh:
             data = json.load(fh)
+        delta_T_mean = None
+        delta_T_min = None
+        delta_T_max = None
+        best_params_path = manifest_path.parent / "best_params.json"
+        if best_params_path.exists():
+            try:
+                best = json.loads(best_params_path.read_text())
+                params = best.get("params", {})
+                delta_ts = []
+                for val in params.values():
+                    dt = val.get("delta_T")
+                    if isinstance(dt, (int, float)):
+                        delta_ts.append(float(dt))
+                if delta_ts:
+                    delta_T_mean = float(sum(delta_ts) / len(delta_ts))
+                    delta_T_min = float(min(delta_ts))
+                    delta_T_max = float(max(delta_ts))
+            except Exception:
+                pass
         rows.append(
             {
                 "material": data.get("material"),
                 "seed": data.get("seed"),
                 "max_evals": data.get("max_evals"),
                 "total_loss": data.get("total_loss"),
+                "delta_T_mean": delta_T_mean,
+                "delta_T_min": delta_T_min,
+                "delta_T_max": delta_T_max,
                 "weights_w_e": data.get("weights", {}).get("w_e"),
                 "weights_w_q": data.get("weights", {}).get("w_q"),
                 "weights_w_r": data.get("weights", {}).get("w_r"),
@@ -186,7 +208,9 @@ def build_config_digest(configs_dir: Path, digest_dir: Path, materials_csv: Path
         pass
 
 
-def inject_xi_into_configs(configs_dir: Path, xi_map: Dict[str, float], default_delta_T: float) -> None:
+def inject_xi_into_configs(
+    configs_dir: Path, xi_map: Dict[str, float], default_delta_T: float, default_delta_space: float
+) -> None:
     """Add xi value/xi_exp/k_skin and xi_sign mapping to each material_config_*.json."""
     import json
 
@@ -229,6 +253,7 @@ def inject_xi_into_configs(configs_dir: Path, xi_map: Dict[str, float], default_
             xi_exp = xi_entry.get("xi_exp", {})
             k_skin = float(xi_entry.get("k_skin", 0.0))
             delta_T = xi_entry.get("delta_T", default_delta_T)
+            delta_space = xi_entry.get("delta_space", default_delta_space)
         else:
             continue
         if xi_value is None:
@@ -253,6 +278,10 @@ def inject_xi_into_configs(configs_dir: Path, xi_map: Dict[str, float], default_
             data["delta_T"] = delta_T
         else:
             data["delta_T"] = data.get("delta_T", delta_T)
+        if "delta_space" not in data:
+            data["delta_space"] = delta_space if isinstance(delta_space, (int, float)) else default_delta_space
+        else:
+            data["delta_space"] = data.get("delta_space", delta_space if isinstance(delta_space, (int, float)) else default_delta_space)
         cfg_path.write_text(json.dumps(data, indent=2))
 
 
@@ -281,8 +310,14 @@ def main() -> None:
     parser.add_argument(
         "--default-delta-T",
         type=float,
-        default=0.05,
+        default=0.0,
         help="Default surface temperature gradient per material (passed to structural noise calc)",
+    )
+    parser.add_argument(
+        "--default-delta-space",
+        type=float,
+        default=0.0,
+        help="Default spatial expansion per material (passed to structural noise calc)",
     )
     args = parser.parse_args()
 
@@ -357,6 +392,7 @@ def main() -> None:
         if materials:
             noise_cmd += ["--materials", *materials]
         noise_cmd += ["--default-delta-T", str(args.default_delta_T)]
+        noise_cmd += ["--default-delta-space", str(args.default_delta_space)]
         run_cmd(noise_cmd, cwd=Path("."))
         if noise_json.exists():
             import json as _json
@@ -365,7 +401,7 @@ def main() -> None:
 
     # Inject xi/xip signs into material configs
     if xi_map:
-        inject_xi_into_configs(configs_dir, xi_map, args.default_delta_T)
+        inject_xi_into_configs(configs_dir, xi_map, args.default_delta_T, args.default_delta_space)
 
     # 3) Run simulator per material
     if not args.skip_simulator:
@@ -401,26 +437,6 @@ def main() -> None:
             if args.huber_delta is not None:
                 sim_cmd += ["--huber-delta", str(args.huber_delta)]
             run_cmd(sim_cmd, cwd=Path("."))
-
-    # 3) Structural noise computation
-    if not args.skip_noise:
-        noise_csv = noise_dir / "structural_noise_summary.csv"
-        noise_json = noise_dir / "structural_noise_values.json"
-        noise_cmd = [
-            "python3",
-            "src/compute_structural_noise.py",
-            "--materials-csv",
-            str(args.materials_csv),
-            "--output-csv",
-            str(noise_csv),
-            "--output-json",
-            str(noise_json),
-        ]
-        if args.fit_noise_by_category:
-            noise_cmd.append("--fit-by-category")
-        if materials:
-            noise_cmd += ["--materials", *materials]
-        run_cmd(noise_cmd, cwd=Path("."))
 
     # 4) Build digests for configs, simulator, and structural noise
     build_config_digest(configs_dir, digest_dir, args.materials_csv)

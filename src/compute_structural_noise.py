@@ -323,11 +323,14 @@ def run(args: argparse.Namespace) -> None:
         summary_df[col_name] = summary_df[f"exp_diff_mean_{prime}"] * k_exp[str(prime)]
     summary_df["k_skin"] = args.k_skin
     summary_df["delta_T"] = args.default_delta_T
+    summary_df["delta_space"] = args.default_delta_space
 
     # Serialization
     output_csv = Path(args.output_csv)
     output_csv.parent.mkdir(parents=True, exist_ok=True)
-    summary_df.to_csv(output_csv, index=False)
+    # The CSV is meant as a human/readable summary; keep surface/expansion params only in JSON to avoid confusion.
+    csv_df = summary_df.drop(columns=["delta_T", "delta_space"], errors="ignore")
+    csv_df.to_csv(output_csv, index=False)
 
     if args.output_json:
         mapping = {}
@@ -338,6 +341,7 @@ def run(args: argparse.Namespace) -> None:
                 "xi_exp": xi_exp,
                 "k_skin": args.k_skin,
                 "delta_T": args.default_delta_T,
+                "delta_space": args.default_delta_space,
             }
         out_json = Path(args.output_json)
         out_json.parent.mkdir(parents=True, exist_ok=True)
@@ -369,8 +373,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--default-delta-T",
         type=float,
-        default=0.05,
+        default=0.0,
         help="Default surface temperature gradient per material (used when no calibration is available)",
+    )
+    parser.add_argument(
+        "--default-delta-space",
+        type=float,
+        default=0.0,
+        help="Default spatial expansion per material (used when no calibration is available)",
     )
     return parser
 

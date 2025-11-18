@@ -88,6 +88,7 @@ class ClusterSimulator:
             "d5": params.delta.get("d5", 0.0),
             "d7": params.delta.get("d7", 0.0),
             "delta_T": getattr(params, "delta_T", 0.0),
+            "delta_space": getattr(params, "delta_space", 0.0),
         }
 
     def set_optimizable_parameters(self, params: SubnetParameters, values: Dict[str, float]) -> None:
@@ -100,3 +101,5 @@ class ClusterSimulator:
                 params.delta[key] = values[key]
         if "delta_T" in values:
             params.delta_T = values["delta_T"]
+        if "delta_space" in values:
+            params.delta_space = values["delta_space"]

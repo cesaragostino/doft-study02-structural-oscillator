@@ -80,6 +80,7 @@ class ReportBundle:
                     "delta": report.parameters.delta,
                     "layer_assignment": report.parameters.layer_assignment,
                     "delta_T": getattr(report.parameters, "delta_T", None),
+                    "delta_space": getattr(report.parameters, "delta_space", None),
                 }
                 for subnet, report in self.subnets.items()
             },
@@ -100,6 +101,7 @@ class ReportBundle:
             "q_sim",
             "residual_sim",
             "delta_T",
+            "delta_space",
             "loss_total",
             "loss_e",
             "loss_q",
@@ -122,6 +124,7 @@ class ReportBundle:
                     "q_sim": report.q_sim,
                     "residual_sim": report.residual_sim,
                     "delta_T": getattr(report.parameters, "delta_T", None),
+                    "delta_space": getattr(report.parameters, "delta_space", None),
                     "loss_total": report.loss.total,
                     "loss_e": report.loss.e_loss,
                     "loss_q": report.loss.q_loss,

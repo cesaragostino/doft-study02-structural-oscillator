@@ -47,6 +47,7 @@ def compute_subnet_loss(
     xi_exp: Optional[dict] = None,
     k_skin: float = 0.0,
     delta_T: float = 0.0,
+    delta_space: float = 0.0,
 ) -> LossBreakdown:
     """Compute the weighted loss for a subnet."""
 
@@ -84,6 +85,9 @@ def compute_subnet_loss(
         # Surface temperature gradient: apply the same direction on every subnet for now.
         gradient_factor = 1.0
         residual_adjusted = residual_adjusted - gradient_factor * delta_T
+        # Spatial expansion term mirrors delta_T: uniform factor for now.
+        space_factor = 1.0
+        residual_adjusted = residual_adjusted - space_factor * delta_space
         diff_r = residual_adjusted - target.residual_exp
         residual_loss = _loss_term(diff_r) * weights.w_r
 
