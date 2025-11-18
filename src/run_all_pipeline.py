@@ -187,7 +187,7 @@ def build_config_digest(configs_dir: Path, digest_dir: Path, materials_csv: Path
 
 
 def inject_xi_into_configs(configs_dir: Path, xi_map: Dict[str, float]) -> None:
-    """Add xi value and xi_sign mapping to each material_config_*.json."""
+    """Add xi value/xi_exp/k_skin and xi_sign mapping to each material_config_*.json."""
     import json
 
     def derive_signs(subnets: List[str]) -> Dict[str, int]:
@@ -216,7 +216,20 @@ def inject_xi_into_configs(configs_dir: Path, xi_map: Dict[str, float]) -> None:
 
     for cfg_path in configs_dir.glob("material_config_*.json"):
         mat = cfg_path.stem.replace("material_config_", "")
-        xi_value = xi_map.get(mat)
+        xi_entry = xi_map.get(mat)
+        if xi_entry is None:
+            continue
+        # Backward compatibility: allow xi_entry to be a scalar
+        if isinstance(xi_entry, (int, float)):
+            xi_value = float(xi_entry)
+            xi_exp = {}
+            k_skin = 0.0
+        elif isinstance(xi_entry, dict):
+            xi_value = xi_entry.get("xi")
+            xi_exp = xi_entry.get("xi_exp", {})
+            k_skin = float(xi_entry.get("k_skin", 0.0))
+        else:
+            continue
         if xi_value is None:
             continue
         try:
@@ -229,6 +242,12 @@ def inject_xi_into_configs(configs_dir: Path, xi_map: Dict[str, float]) -> None:
         xi_sign = derive_signs([str(s) for s in subnets])
         data["xi"] = float(xi_value)
         data["xi_sign"] = xi_sign
+        if xi_exp:
+            data["xi_exp"] = xi_exp
+        if "k_skin" not in data:
+            data["k_skin"] = k_skin
+        else:
+            data["k_skin"] = data.get("k_skin", k_skin)
         cfg_path.write_text(json.dumps(data, indent=2))
 
 
@@ -253,6 +272,7 @@ def main() -> None:
     parser.add_argument("--fit-noise-by-category", action="store_true")
     parser.add_argument("--skip-simulator", action="store_true", help="Only generate configs and structural noise")
     parser.add_argument("--skip-noise", action="store_true", help="Skip structural noise computation")
+    parser.add_argument("--k-skin", type=float, default=0.05, help="Skin coupling coefficient for structural noise term")
     args = parser.parse_args()
 
     output_root = args.output_root
@@ -318,6 +338,8 @@ def main() -> None:
             str(noise_csv),
             "--output-json",
             str(noise_json),
+            "--k-skin",
+            str(args.k_skin),
         ]
         if args.fit_noise_by_category:
             noise_cmd.append("--fit-by-category")

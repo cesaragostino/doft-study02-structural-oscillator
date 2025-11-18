@@ -159,10 +159,13 @@ def collect_materials(df: pd.DataFrame, requested: Optional[Sequence[str]]) -> L
     names = sorted(set(df["name"]))
     if not requested:
         return names
+    filtered = [name for name in requested if name in names]
     missing = [name for name in requested if name not in names]
     if missing:
-        raise ValueError(f"Materials not found in dataset: {missing}")
-    return list(requested)
+        print(f"[WARN] Skipping materials not present in dataset: {missing}")
+    if not filtered:
+        return names
+    return list(filtered)
 
 
 def build_ground_truth_entry(

@@ -30,6 +30,7 @@ PRIMES: Tuple[int, int, int, int] = (2, 3, 5, 7)
 MEV_TO_K = 11.6045
 EV_TO_K = 11604.5
 RATIO_KEYS: Tuple[str, str, str] = ("th_to_delta", "delta_to_theta", "theta_to_ef")
+PRIME_STR: Tuple[str, str, str, str] = tuple(str(p) for p in PRIMES)
 
 
 # ---- primitive helpers -----------------------------------------------------
@@ -124,15 +125,20 @@ def compute_pair_metrics(
     locks_by_ratio_b: Dict[str, Tuple[int, int, int, int]],
     ratios_a: Dict[str, float],
     ratios_b: Dict[str, float],
-) -> Tuple[float, float, int]:
+) -> Tuple[float, float, int, List[float], List[int]]:
     mismatch_total = 0.0
     mstruct = 0.0
     used_terms = 0
+    exp_diffs_sum = [0.0, 0.0, 0.0, 0.0]
+    exp_diffs_count = [0, 0, 0, 0]
     for key in RATIO_KEYS:
         exps_a = locks_by_ratio_a.get(key)
         exps_b = locks_by_ratio_b.get(key)
         if exps_a is not None and exps_b is not None:
             mismatch_total += mismatch_between(exps_a, exps_b)
+            for idx, (ea, eb) in enumerate(zip(exps_a, exps_b)):
+                exp_diffs_sum[idx] += abs(ea - eb)
+                exp_diffs_count[idx] += 1
 
         v1 = ratios_a.get(key)
         v2 = ratios_b.get(key)
@@ -143,7 +149,7 @@ def compute_pair_metrics(
         mstruct += 2.0 * (delta * delta)
         used_terms += 1
 
-    return mismatch_total, mstruct, used_terms
+    return mismatch_total, mstruct, used_terms, exp_diffs_sum, exp_diffs_count
 
 
 # ---- main pipeline ---------------------------------------------------------
@@ -169,15 +175,19 @@ def summarize_material(name: str, group: pd.DataFrame) -> Dict[str, object]:
         subnet_entries[subnet] = compute_ratios_for_row(rows.iloc[0])
 
     pair_metrics = []
+    exp_diff_sum = [0.0, 0.0, 0.0, 0.0]
+    exp_diff_count = [0, 0, 0, 0]
     for a, b in combinations(subnets, 2):
         entry_a = subnet_entries[a]
         entry_b = subnet_entries[b]
-        mismatch_total, mstruct, used_terms = compute_pair_metrics(
+        mismatch_total, mstruct, used_terms, diffs_sum, diffs_count = compute_pair_metrics(
             entry_a.locks, entry_b.locks, entry_a.ratios, entry_b.ratios
         )
         if used_terms == 0:
             continue
         pair_metrics.append((mismatch_total, mstruct))
+        exp_diff_sum = [sa + sb for sa, sb in zip(exp_diff_sum, diffs_sum)]
+        exp_diff_count = [ca + cb for ca, cb in zip(exp_diff_count, diffs_count)]
 
     if not pair_metrics:
         return {
@@ -191,6 +201,10 @@ def summarize_material(name: str, group: pd.DataFrame) -> Dict[str, object]:
             "M_struct_sum": 0.0,
             "M_struct_mean": 0.0,
             "ratios_used_mean": 0.0,
+            "exp_diff_mean_2": 0.0,
+            "exp_diff_mean_3": 0.0,
+            "exp_diff_mean_5": 0.0,
+            "exp_diff_mean_7": 0.0,
         }
 
     mismatch_sum = sum(m for m, _ in pair_metrics)
@@ -207,6 +221,10 @@ def summarize_material(name: str, group: pd.DataFrame) -> Dict[str, object]:
         )
         ratios_used_mean = total_terms / pair_count
 
+    exp_diff_mean = [
+        (exp_diff_sum[idx] / exp_diff_count[idx]) if exp_diff_count[idx] > 0 else 0.0 for idx in range(4)
+    ]
+
     return {
         "name": name,
         "subnets": subnets,
@@ -218,6 +236,10 @@ def summarize_material(name: str, group: pd.DataFrame) -> Dict[str, object]:
         "M_struct_sum": mstruct_sum,
         "M_struct_mean": mstruct_mean,
         "ratios_used_mean": ratios_used_mean,
+        "exp_diff_mean_2": exp_diff_mean[0],
+        "exp_diff_mean_3": exp_diff_mean[1],
+        "exp_diff_mean_5": exp_diff_mean[2],
+        "exp_diff_mean_7": exp_diff_mean[3],
     }
 
 
@@ -266,6 +288,16 @@ def run(args: argparse.Namespace) -> None:
         summary_df["M_struct_mean"].to_numpy(dtype=float),
     )
 
+    # Calibration of k_exp per prime using exp_diff_mean_* vs M_struct_mean
+    k_exp: Dict[str, float] = {str(p): 0.0 for p in PRIMES}
+    corr_exp: Dict[str, Optional[float]] = {str(p): None for p in PRIMES}
+    x_exp = summary_df[[f"exp_diff_mean_{p}" for p in PRIMES]].to_numpy(dtype=float)
+    y = summary_df["M_struct_mean"].to_numpy(dtype=float)
+    for idx, prime in enumerate(PRIMES):
+        k_val, c_val = calc_zeta(x_exp[:, idx], y)
+        k_exp[str(prime)] = k_val
+        corr_exp[str(prime)] = c_val
+
     # Category-specific zeta if requested
     zeta_by_cat: Dict[str, float] = {}
     corr_by_cat: Dict[str, Optional[float]] = {}
@@ -285,6 +317,11 @@ def run(args: argparse.Namespace) -> None:
 
     summary_df["zeta_used"] = summary_df["category"].apply(select_zeta)
     summary_df["predicted_noise"] = summary_df["zeta_used"] * summary_df["mismatch_mean"]
+    # xi_exp per prime
+    for prime in PRIMES:
+        col_name = f"xi_exp_{prime}"
+        summary_df[col_name] = summary_df[f"exp_diff_mean_{prime}"] * k_exp[str(prime)]
+    summary_df["k_skin"] = args.k_skin
 
     # Serialization
     output_csv = Path(args.output_csv)
@@ -292,7 +329,14 @@ def run(args: argparse.Namespace) -> None:
     summary_df.to_csv(output_csv, index=False)
 
     if args.output_json:
-        mapping = {row.name: row.predicted_noise for row in summary_df.itertuples()}
+        mapping = {}
+        for row in summary_df.itertuples():
+            xi_exp = {str(p): getattr(row, f"xi_exp_{p}") for p in PRIMES}
+            mapping[row.name] = {
+                "xi": row.predicted_noise,
+                "xi_exp": xi_exp,
+                "k_skin": args.k_skin,
+            }
         out_json = Path(args.output_json)
         out_json.parent.mkdir(parents=True, exist_ok=True)
         out_json.write_text(json.dumps(mapping, indent=2))
@@ -301,6 +345,7 @@ def run(args: argparse.Namespace) -> None:
     if args.fit_by_category:
         for cat, z in zeta_by_cat.items():
             print(f"  {cat}: ζ={z:.6f} | corr={corr_by_cat.get(cat)}")
+    print(f"k_exp per prime: {k_exp} | corr_exp={corr_exp}")
     print(f"Wrote summary to {output_csv}")
     if args.output_json:
         print(f"Wrote predicted noise JSON to {args.output_json}")
@@ -318,6 +363,7 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Optional CSV with precomputed M_struct (columns: name, M_struct)",
     )
+    parser.add_argument("--k-skin", type=float, default=0.05, help="Skin coupling coefficient for structural noise term")
     return parser
 
 

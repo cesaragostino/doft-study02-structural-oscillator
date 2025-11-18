@@ -143,7 +143,9 @@ class MaterialConfig:
     subnets: List[str]
     anchors: Dict[str, Dict[str, float]]
     xi: Optional[float] = None
+    xi_exp: Dict[str, float] = field(default_factory=dict)
     xi_sign: Dict[str, int] = field(default_factory=dict)
+    k_skin: float = 0.0
 
     @classmethod
     def from_file(cls, path: Path) -> "MaterialConfig":
@@ -159,6 +161,12 @@ class MaterialConfig:
             xi = float(xi_value)
         else:
             xi = None
+        xi_exp = {}
+        raw_xi_exp = data.get("xi_exp", {})
+        if isinstance(raw_xi_exp, dict):
+            for key, val in raw_xi_exp.items():
+                if isinstance(val, (int, float)) and math.isfinite(val):
+                    xi_exp[str(key)] = float(val)
         xi_sign = {}
         raw_sign = data.get("xi_sign", {})
         if isinstance(raw_sign, dict):
@@ -167,7 +175,10 @@ class MaterialConfig:
                     xi_sign[str(key)] = int(val)
                 except Exception:
                     continue
-        return cls(material=material, subnets=subnets, anchors=anchors, xi=xi, xi_sign=xi_sign)
+        k_skin = 0.0
+        if isinstance(data.get("k_skin"), (int, float)):
+            k_skin = float(data["k_skin"])
+        return cls(material=material, subnets=subnets, anchors=anchors, xi=xi, xi_exp=xi_exp, xi_sign=xi_sign, k_skin=k_skin)
 
 
 @dataclass
