@@ -76,16 +76,17 @@ def load_pressure_map(materials_csv: Path) -> Dict[str, float]:
     if "name" not in df.columns:
         return {}
     pressure_col = "pressure_GPa" if "pressure_GPa" in df.columns else None
+    if not pressure_col:
+        raise ValueError("materials CSV must contain a 'pressure_GPa' column; no inference will be applied.")
     mapping = {}
     for row in df.itertuples():
         name = str(getattr(row, "name"))
-        if pressure_col:
-            try:
-                pressure_val = float(getattr(row, "pressure_GPa"))
-            except Exception:
-                pressure_val = 0.0
-        else:
-            pressure_val = 0.0
+        try:
+            pressure_val = float(getattr(row, "pressure_GPa"))
+        except Exception:
+            raise ValueError(f"Non-numeric pressure_GPa for material '{name}'.")
+        if not (pressure_val == pressure_val and abs(pressure_val) < float('inf')):
+            raise ValueError(f"Missing or non-finite pressure_GPa for material '{name}'.")
         mapping[name] = pressure_val
     return mapping
 
@@ -586,7 +587,7 @@ def main() -> None:
     parser.add_argument("--max-evals", type=int, default=500)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--seed-sweep", type=int, default=1)
-    parser.add_argument("--materials-csv", type=Path, default=Path("data/raw/materials_clusters_real_v6.csv"))
+    parser.add_argument("--materials-csv", type=Path, default=Path("data/raw/materials_clusters_real_v7.csv"))
     parser.add_argument("--fit-noise-by-category", action="store_true")
     parser.add_argument("--skip-simulator", action="store_true", help="Only generate configs and structural noise")
     parser.add_argument("--skip-noise", action="store_true", help="Skip structural noise computation")
@@ -615,6 +616,20 @@ def main() -> None:
         default=1.0,
         help="Reference pressure (GPa) for delta_P normalisation",
     )
+    parser.add_argument("--run-sensitivity", action="store_true", help="Run sensitivity_analysis per material and store CSVs in digest/")
+    parser.add_argument(
+        "--sensitivity-perturbations",
+        type=int,
+        default=100,
+        help="Number of perturbations for sensitivity analysis",
+    )
+    parser.add_argument(
+        "--sensitivity-epsilon",
+        type=float,
+        default=0.05,
+        help="Relative noise level for perturbations (e.g., 0.05 = ±5%)",
+    )
+    parser.add_argument("--run-loo", action="store_true", help="Run leave-one-out validation across families")
     args = parser.parse_args()
 
     output_root = args.output_root
@@ -628,6 +643,7 @@ def main() -> None:
     if not args.skip_noise:
         noise_dir.mkdir(parents=True, exist_ok=True)
 
+    print("[INFO] Loading eta and preparing materials list…")
     eta_path = args.eta if args.eta else default_eta_path(args.results_root, args.tag)
 
     # Resolve materials before generating configs
@@ -658,6 +674,7 @@ def main() -> None:
     ]
     if material_list:
         gen_cmd += ["--materials", *material_list]
+    print("[INFO] Generating DOFT configs…")
     run_cmd(gen_cmd, cwd=Path("."))
 
     # Discover materials based on generated configs to avoid missing targets
@@ -672,6 +689,7 @@ def main() -> None:
     noise_json = noise_dir / "structural_noise_values.json"
     xi_map = {}
     if not args.skip_noise:
+        print("[INFO] Computing structural noise (xi, delta_T, delta_space, delta_P)…")
         noise_cmd = [
             "python3",
             "src/compute_structural_noise.py",
@@ -700,10 +718,12 @@ def main() -> None:
 
     # Inject xi/xip signs into material configs
     if xi_map:
+        print("[INFO] Injecting xi and deltas into material configs…")
         inject_xi_into_configs(configs_dir, xi_map, args.default_delta_T, args.default_delta_space)
 
     # 3) Run simulator per material
     if not args.skip_simulator:
+        print("[INFO] Running simulator across materials…")
         for mat in materials:
             config_path = configs_dir / f"material_config_{mat}.json"
             targets_path = configs_dir / f"ground_truth_targets_{mat}.json"
@@ -738,6 +758,7 @@ def main() -> None:
             run_cmd(sim_cmd, cwd=Path("."))
 
     # 4) Build digests for configs, simulator, and structural noise
+    print("[INFO] Building digests (configs, simulator, noise, pressure)…")
     build_config_digest(configs_dir, digest_dir, args.materials_csv)
     sim_summary_path = digest_dir / "simulator_summary.csv"
     pressure_lookup = dict(pressure_map)
@@ -756,7 +777,54 @@ def main() -> None:
         build_family_correlation(noise_csv, sim_summary_path, digest_dir)
         build_pressure_digest(noise_json, sim_summary_path, digest_dir, pressure_lookup)
 
-    print(f"Pipeline completed. Outputs under: {output_root}")
+    # Optional stability validations
+    if args.run_sensitivity and not args.skip_noise:
+        if not noise_json.exists():
+            print("[WARN] Sensitivity skipped: noise JSON not found.")
+        else:
+            sens_out = digest_dir / "sensitivity"
+            sens_out.mkdir(parents=True, exist_ok=True)
+            print("[INFO] Running sensitivity analysis per material…")
+            for mat in materials:
+                out_csv = sens_out / f"sensitivity_{mat}.csv"
+                sens_cmd = [
+                    "python3",
+                    "src/tools/sensitivity_analysis.py",
+                    "--materials-csv",
+                    str(args.materials_csv),
+                    "--noise-json",
+                    str(noise_json),
+                    "--material",
+                    mat,
+                    "--n-perturbations",
+                    str(args.sensitivity_perturbations),
+                    "--epsilon",
+                    str(args.sensitivity_epsilon),
+                    "--c-pressure",
+                    str(args.c_pressure),
+                    "--pressure-ref",
+                    str(args.pressure_ref),
+                    "--output",
+                    str(out_csv),
+                ]
+                run_cmd(sens_cmd, cwd=Path("."))
+    if args.run_loo and not args.skip_noise:
+        if not noise_json.exists():
+            print("[WARN] LOO validation skipped: noise JSON not found.")
+        else:
+            loo_out = digest_dir / "loo_validation.csv"
+            loo_cmd = [
+                "python3",
+                "src/tools/loo_validation.py",
+                "--noise-json",
+                str(noise_json),
+                "--output",
+                str(loo_out),
+            ]
+            print("[INFO] Running leave-one-out validation…")
+            run_cmd(loo_cmd, cwd=Path("."))
+
+    print(f"[DONE] Pipeline completed. Outputs under: {output_root}")
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 """Compute structural noise factors from Study 01 (v6) materials.
 
-The script ingests the multiband materials CSV (e.g. data/raw/materials_clusters_real_v6.csv),
+The script ingests the multiband materials CSV (e.g. data/raw/materials_clusters_real_v7.csv),
 computes DOFT ratios per subred (th->Δ, Δ->ΘD, ΘD->EF), finds the closest integer locks
 on the 2-3-5-7 grid, and aggregates mismatch/M_struct metrics across subredes.
 
@@ -240,7 +240,9 @@ def initialise_pressure_vectors(
     pressure_ref: float,
 ) -> Dict[str, Dict[str, float]]:
     """Generate δP per subnet and prime using external pressure."""
-
+    if not math.isfinite(pressure_gpa):
+        raise ValueError("Non-finite pressure value encountered; aborting to avoid implicit assumptions.")
+    pressure_gpa = max(0.0, pressure_gpa)
     if pressure_ref <= 0:
         pressure_ref = PRESSURE_REF_GPA
     scale = c_pressure * (pressure_gpa / pressure_ref)
@@ -364,8 +366,12 @@ def load_existing_mstruct(path: Optional[Path]) -> Dict[str, float]:
 def run(args: argparse.Namespace) -> None:
     df = pd.read_csv(args.materials_csv)
     if "pressure_GPa" not in df.columns:
-        df["pressure_GPa"] = 0.0
-    df["pressure_GPa"] = pd.to_numeric(df["pressure_GPa"], errors="coerce").fillna(0.0)
+        raise ValueError("materials CSV must contain a 'pressure_GPa' column; no inference is applied.")
+    df["pressure_GPa"] = pd.to_numeric(df["pressure_GPa"], errors="coerce")
+    missing_pressure = df[df["pressure_GPa"].isna()]
+    if not missing_pressure.empty:
+        names = missing_pressure["name"].astype(str).unique().tolist()
+        raise ValueError(f"'pressure_GPa' has non-numeric/missing values for: {names[:10]} (showing up to 10).")
     if args.materials:
         allowed = set(args.materials)
         df = df[df["name"].isin(allowed)]
@@ -497,7 +503,7 @@ def run(args: argparse.Namespace) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Compute structural noise factors from Study 01 v6 data")
-    parser.add_argument("--materials-csv", type=Path, default=Path("data/raw/materials_clusters_real_v6.csv"))
+    parser.add_argument("--materials-csv", type=Path, default=Path("data/raw/materials_clusters_real_v7.csv"))
     parser.add_argument("--output-csv", type=Path, default=Path("outputs/structural_noise_summary.csv"))
     parser.add_argument("--output-json", type=Path, help="Optional path to write {material: xi} mapping")
     parser.add_argument("--materials", nargs="*", help="Optional list of materials to include")
