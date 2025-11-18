@@ -281,7 +281,7 @@ def main() -> None:
     parser.add_argument(
         "--default-delta-T",
         type=float,
-        default=0.0,
+        default=0.05,
         help="Default surface temperature gradient per material (passed to structural noise calc)",
     )
     args = parser.parse_args()

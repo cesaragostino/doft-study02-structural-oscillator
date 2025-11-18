@@ -76,13 +76,14 @@ def compute_subnet_loss(
     if target.residual_exp is not None:
         residual_adjusted = simulation.residual_sim
         if xi_value is not None:
-            residual_adjusted = residual_adjusted + (xi_sign or 0) * xi_value
-            residual_adjusted = residual_adjusted + (xi_sign or 0) * (k_skin or 0.0) * xi_value
+            residual_adjusted = residual_adjusted - (xi_sign or 0) * xi_value
+            residual_adjusted = residual_adjusted - (xi_sign or 0) * (k_skin or 0.0) * xi_value
         if xi_exp:
             exp_shift = sum(float(v) for v in xi_exp.values())
-            residual_adjusted = residual_adjusted + (xi_sign or 0) * exp_shift
-        if delta_T:
-            residual_adjusted = residual_adjusted + (xi_sign or 0) * delta_T
+            residual_adjusted = residual_adjusted - (xi_sign or 0) * exp_shift
+        # Surface temperature gradient: apply the same direction on every subnet for now.
+        gradient_factor = 1.0
+        residual_adjusted = residual_adjusted - gradient_factor * delta_T
         diff_r = residual_adjusted - target.residual_exp
         residual_loss = _loss_term(diff_r) * weights.w_r
 

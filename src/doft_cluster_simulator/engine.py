@@ -57,6 +57,7 @@ class SimulationEngine:
                 xi_sign=xi_sign,
                 xi_exp=xi_exp,
                 k_skin=k_skin,
+                base_delta_T=self.config.delta_T,
             )
             result = optimizer.optimise(target)
             subnet_results[subnet_name] = SubnetSimulation(

@@ -61,3 +61,47 @@ def test_engine_runs_end_to_end(tmp_path: Path) -> None:
     assert (out_dir / "simulation_results.csv").exists()
     assert (out_dir / "report.md").exists()
     assert (out_dir / "manifest.json").exists()
+
+
+def test_residual_loss_uses_delta_T_and_xi_shift() -> None:
+    params = SubnetParameters(
+        L=1,
+        f0=1.0,
+        ratios={"r2": 0.0, "r3": 0.0, "r5": 0.0, "r7": 0.0},
+        delta={"d2": 0.0, "d3": 0.0, "d5": 0.0, "d7": 0.0},
+        layer_assignment=[1, 1, 1, 1],
+        delta_T=0.1,
+    )
+    simulation = SimulationResult(
+        e_sim=[0.0, 0.0, 0.0, 0.0],
+        q_sim=None,
+        residual_sim=0.5,
+        layer_factors=[1.0, 1.0, 1.0, 1.0],
+    )
+    target = SubnetTarget(e_exp=None, q_exp=None, residual_exp=0.1)
+    weights = LossWeights(w_r=1.0)
+    xi_value = 0.2
+    xi_sign = 1
+    xi_exp = {"2": 0.05}
+    k_skin = 0.1
+
+    breakdown = compute_subnet_loss(
+        target=target,
+        params=params,
+        simulation=simulation,
+        weights=weights,
+        anchor_value=None,
+        xi_value=xi_value,
+        xi_sign=xi_sign,
+        xi_exp=xi_exp,
+        k_skin=k_skin,
+        delta_T=params.delta_T,
+    )
+
+    expected_adjusted = simulation.residual_sim
+    expected_adjusted -= xi_sign * xi_value
+    expected_adjusted -= xi_sign * k_skin * xi_value
+    expected_adjusted -= xi_sign * sum(xi_exp.values())
+    expected_adjusted -= params.delta_T  # gradient factor = 1
+    expected_loss = (expected_adjusted - target.residual_exp) ** 2
+    assert abs(breakdown.residual_loss - expected_loss) < 1e-12

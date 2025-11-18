@@ -36,6 +36,7 @@ class SubnetOptimizer:
         xi_sign: int,
         xi_exp: Optional[dict],
         k_skin: float,
+        base_delta_T: float = 0.0,
     ) -> None:
         self.simulator = simulator
         self.weights = weights
@@ -48,6 +49,7 @@ class SubnetOptimizer:
         self.xi_sign = xi_sign
         self.xi_exp = xi_exp or {}
         self.k_skin = k_skin
+        self.base_delta_T = base_delta_T
 
     def optimise(self, target: SubnetTarget) -> OptimizationResult:
         best_params: Optional[SubnetParameters] = None
@@ -100,7 +102,7 @@ class SubnetOptimizer:
         ratios = {key: self.rng.uniform(*self.bounds.ratios) for key in PRIME_KEYS}
         delta = {key: self.rng.uniform(*self.bounds.deltas) for key in DELTA_KEYS}
         layer_assignment = [self.rng.randint(1, L) for _ in PRIME_KEYS]
-        delta_T = 0.0
+        delta_T = self.base_delta_T + self.rng.gauss(0.0, 0.01)
         return SubnetParameters(L=L, f0=f0, ratios=ratios, delta=delta, layer_assignment=layer_assignment, delta_T=delta_T)
 
     def _perturb(self, params: SubnetParameters) -> SubnetParameters:

@@ -369,7 +369,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--default-delta-T",
         type=float,
-        default=0.0,
+        default=0.05,
         help="Default surface temperature gradient per material (used when no calibration is available)",
     )
     return parser
