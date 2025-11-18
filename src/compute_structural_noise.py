@@ -32,6 +32,17 @@ EV_TO_K = 11604.5
 RATIO_KEYS: Tuple[str, str, str] = ("th_to_delta", "delta_to_theta", "theta_to_ef")
 PRIME_STR: Tuple[str, str, str, str] = tuple(str(p) for p in PRIMES)
 DEFAULT_LAMBDA_GEO: Tuple[float, float, float, float] = (1.0, 0.8, 0.4, 0.1)
+DEFAULT_LAMBDA_PRESSURE_GEO: Tuple[float, float, float, float] = (1.0, 0.8, 0.4, 0.1)
+PRESSURE_REF_GPA = 1.0
+FAMILY_PROFILES = {
+    "highpressure": {"scale": 1.6, "cap": 0.1, "weights": (1.1, 1.0, 0.8, 0.6)},
+    "sc_highpressure": {"scale": 1.6, "cap": 0.1, "weights": (1.1, 1.0, 0.8, 0.6)},
+    "binary": {"scale": 0.9, "cap": 0.05, "weights": (1.0, 1.0, 1.0, 1.0)},
+    "sc_binary": {"scale": 0.9, "cap": 0.05, "weights": (1.0, 1.0, 1.0, 1.0)},
+    "sc_typei": {"scale": 0.8, "cap": 0.05, "weights": (1.0, 1.0, 0.9, 0.8)},
+    "ironbased": {"scale": 1.1, "cap": 0.08, "weights": (1.2, 1.0, 0.6, 0.5)},
+    "sc_ironbased": {"scale": 1.1, "cap": 0.08, "weights": (1.2, 1.0, 0.6, 0.5)},
+}
 
 
 # ---- primitive helpers -----------------------------------------------------
@@ -162,18 +173,33 @@ def infer_lambda_band(subnet: str) -> float:
     return 1.0
 
 
-def build_decay_vector(exp_diff_mean: Sequence[float], target_sum: float, lambda_geo: Sequence[float]) -> Dict[str, float]:
+def build_decay_vector(
+    exp_diff_mean: Sequence[float], target_sum: float, lambda_geo: Sequence[float], profile_weights: Optional[Sequence[float]] = None
+) -> Dict[str, float]:
     """Create a prime-indexed vector that decays towards the core."""
 
     # Prefer the observed exponent diff profile; fall back to a generic skin-heavy profile.
     weights = np.array(exp_diff_mean, dtype=float)
     if not np.any(weights):
         weights = np.array([1.0, 0.8, 0.4, 0.2], dtype=float)
+    if profile_weights is not None:
+        profile_arr = np.array(profile_weights, dtype=float)
+        if profile_arr.shape == weights.shape:
+            weights = np.maximum(weights * profile_arr, 1e-6)
     geo = np.array(lambda_geo, dtype=float)
     weights = np.maximum(weights * geo, 1e-6)
     weights = weights / max(weights.sum(), 1e-6)
     values = np.clip(weights * target_sum, -0.1, 0.1)
     return {str(prime): float(values[idx]) for idx, prime in enumerate(PRIMES)}
+
+
+def _family_profile(category: str) -> Tuple[float, float, Sequence[float]]:
+    key = category.lower().strip()
+    params = FAMILY_PROFILES.get(key, {})
+    scale = params.get("scale", 1.0)
+    cap = params.get("cap", 0.1)
+    weights = params.get("weights", (1.0, 0.8, 0.4, 0.2))
+    return float(scale), float(cap), weights
 
 
 def initialise_delta_vectors(
@@ -183,21 +209,50 @@ def initialise_delta_vectors(
     lambda_geo_vec: Sequence[float],
     default_delta_T: float = 0.0,
     default_delta_space: float = 0.0,
+    category: str = "",
 ) -> Tuple[Dict[str, Dict[str, float]], Dict[str, Dict[str, float]], Dict[str, float]]:
     """Generate decaying δT/δspace vectors per subnet plus lambda_band defaults."""
 
+    scale, cap, profile_weights = _family_profile(category)
     # Scale magnitude using both mismatch level and how many ratios contributed.
-    base = 0.015
-    mismatch_term = min(max(mismatch_mean, 0.0) * 0.005, 0.02)
-    exp_term = min(sum(exp_diff_mean) * 0.0015, 0.02)
-    target_sum = min(0.05, max(abs(default_delta_T), base + mismatch_term + exp_term))
-    space_sum = min(0.05, max(abs(default_delta_space), target_sum * 0.7))
-    delta_T_vec = build_decay_vector(exp_diff_mean, target_sum, lambda_geo_vec)
-    delta_space_vec = build_decay_vector(exp_diff_mean, space_sum, lambda_geo_vec)
+    base = 0.015 * scale
+    mismatch_term = min(max(mismatch_mean, 0.0) * 0.005 * scale, 0.02 * scale)
+    exp_term = min(sum(exp_diff_mean) * 0.0015 * scale, 0.02 * scale)
+    target_sum = min(cap, max(abs(default_delta_T), base + mismatch_term + exp_term))
+    space_sum = min(cap, max(abs(default_delta_space), target_sum * 0.7))
+    delta_T_vec = build_decay_vector(exp_diff_mean, target_sum, lambda_geo_vec, profile_weights=profile_weights)
+    delta_space_vec = build_decay_vector(exp_diff_mean, space_sum, lambda_geo_vec, profile_weights=profile_weights)
+    if category.lower().startswith("iron"):
+        # Slight inward inversion for iron-based: encourage inner correction.
+        delta_space_vec["7"] = max(-cap, min(cap, delta_space_vec.get("7", 0.0) * -0.5))
     subnet_delta_T = {subnet: dict(delta_T_vec) for subnet in subnets}
     subnet_delta_space = {subnet: dict(delta_space_vec) for subnet in subnets}
     lambda_band_map = {subnet: infer_lambda_band(subnet) for subnet in subnets}
     return subnet_delta_T, subnet_delta_space, lambda_band_map
+
+
+def initialise_pressure_vectors(
+    subnets: Sequence[str],
+    pressure_gpa: float,
+    lambda_pressure_geo: Sequence[float],
+    lambda_pressure_band: Dict[str, float],
+    c_pressure: float,
+    pressure_ref: float,
+) -> Dict[str, Dict[str, float]]:
+    """Generate δP per subnet and prime using external pressure."""
+
+    if pressure_ref <= 0:
+        pressure_ref = PRESSURE_REF_GPA
+    scale = c_pressure * (pressure_gpa / pressure_ref)
+    lambda_geo_arr = np.array(lambda_pressure_geo, dtype=float)
+    delta_per_prime = np.clip(scale * lambda_geo_arr, -0.1, 0.1)
+    base_vec = {str(prime): float(delta_per_prime[idx]) for idx, prime in enumerate(PRIMES)}
+    subnet_map: Dict[str, Dict[str, float]] = {}
+    for subnet in subnets:
+        lambda_band_val = lambda_pressure_band.get(subnet, 1.0)
+        vec = {k: np.clip(v * lambda_band_val, -0.1, 0.1) for k, v in base_vec.items()}
+        subnet_map[subnet] = vec
+    return subnet_map
 
 
 # ---- main pipeline ---------------------------------------------------------
@@ -221,6 +276,7 @@ def summarize_material(name: str, group: pd.DataFrame) -> Dict[str, object]:
     subnet_entries: Dict[str, SubnetRatios] = {}
     for subnet, rows in group.groupby("sub_network"):
         subnet_entries[subnet] = compute_ratios_for_row(rows.iloc[0])
+    pressure = float(group["pressure_GPa"].iloc[0]) if "pressure_GPa" in group.columns else 0.0
 
     pair_metrics = []
     exp_diff_sum = [0.0, 0.0, 0.0, 0.0]
@@ -253,6 +309,7 @@ def summarize_material(name: str, group: pd.DataFrame) -> Dict[str, object]:
             "exp_diff_mean_3": 0.0,
             "exp_diff_mean_5": 0.0,
             "exp_diff_mean_7": 0.0,
+            "pressure_GPa": pressure,
         }
 
     mismatch_sum = sum(m for m, _ in pair_metrics)
@@ -288,6 +345,7 @@ def summarize_material(name: str, group: pd.DataFrame) -> Dict[str, object]:
         "exp_diff_mean_3": exp_diff_mean[1],
         "exp_diff_mean_5": exp_diff_mean[2],
         "exp_diff_mean_7": exp_diff_mean[3],
+        "pressure_GPa": pressure,
     }
 
 
@@ -305,6 +363,9 @@ def load_existing_mstruct(path: Optional[Path]) -> Dict[str, float]:
 
 def run(args: argparse.Namespace) -> None:
     df = pd.read_csv(args.materials_csv)
+    if "pressure_GPa" not in df.columns:
+        df["pressure_GPa"] = 0.0
+    df["pressure_GPa"] = pd.to_numeric(df["pressure_GPa"], errors="coerce").fillna(0.0)
     if args.materials:
         allowed = set(args.materials)
         df = df[df["name"].isin(allowed)]
@@ -391,6 +452,19 @@ def run(args: argparse.Namespace) -> None:
                 DEFAULT_LAMBDA_GEO,
                 default_delta_T=args.default_delta_T,
                 default_delta_space=args.default_delta_space,
+                category=str(getattr(row, "category", "")),
+            )
+            lambda_pressure_band_map = {subnet: lambda_band_map.get(subnet, 1.0) for subnet in subnets}
+            lambda_pressure_geo_vec = DEFAULT_LAMBDA_PRESSURE_GEO
+            lambda_pressure_geo = {str(p): lambda_pressure_geo_vec[idx] for idx, p in enumerate(PRIMES)}
+            pressure_val = float(getattr(row, "pressure_GPa", 0.0) or 0.0)
+            subnet_delta_P = initialise_pressure_vectors(
+                subnets,
+                pressure_val,
+                lambda_pressure_geo_vec,
+                lambda_pressure_band_map,
+                c_pressure=args.c_pressure,
+                pressure_ref=args.pressure_ref,
             )
             mapping[row.name] = {
                 "xi": row.predicted_noise,
@@ -398,9 +472,14 @@ def run(args: argparse.Namespace) -> None:
                 "k_skin": args.k_skin,
                 "delta_T": subnet_delta_T,
                 "delta_space": subnet_delta_space,
+                "delta_P": subnet_delta_P,
                 "lambda_band": lambda_band_map,
                 "lambda_geo": {str(p): DEFAULT_LAMBDA_GEO[idx] for idx, p in enumerate(PRIMES)},
+                "lambda_pressure_band": lambda_pressure_band_map,
+                "lambda_pressure_geo": lambda_pressure_geo,
                 "subnets": subnets,
+                "category": str(getattr(row, "category", "")) or "Unknown",
+                "pressure_GPa": pressure_val,
             }
         out_json = Path(args.output_json)
         out_json.parent.mkdir(parents=True, exist_ok=True)
@@ -440,6 +519,18 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         default=0.0,
         help="Default spatial expansion per material (used when no calibration is available)",
+    )
+    parser.add_argument(
+        "--c-pressure",
+        type=float,
+        default=0.01,
+        help="Global factor to scale pressure-induced delta_P",
+    )
+    parser.add_argument(
+        "--pressure-ref",
+        type=float,
+        default=PRESSURE_REF_GPA,
+        help="Reference pressure in GPa to normalise delta_P initialisation",
     )
     return parser
 

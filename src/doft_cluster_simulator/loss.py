@@ -48,6 +48,8 @@ def compute_subnet_loss(
     k_skin: float = 0.0,
     lambda_band: float = 1.0,
     lambda_geo: Optional[dict] = None,
+    lambda_pressure_band: float = 1.0,
+    lambda_pressure_geo: Optional[dict] = None,
 ) -> LossBreakdown:
     """Compute the weighted loss for a subnet."""
 
@@ -85,12 +87,18 @@ def compute_subnet_loss(
         lambda_geo_vec = {str(p): float(lambda_geo.get(str(p), 1.0)) for p in PRIMES} if lambda_geo else {str(p): 1.0 for p in PRIMES}
         delta_T_vec = {str(k): float(v) for k, v in params.delta_T.items()} if params.delta_T else {}
         delta_space_vec = {str(k): float(v) for k, v in params.delta_space.items()} if params.delta_space else {}
+        delta_P_vec = {str(k): float(v) for k, v in params.delta_P.items()} if getattr(params, "delta_P", None) else {}
+        lambda_pressure_geo_vec = (
+            {str(p): float(lambda_pressure_geo.get(str(p), 1.0)) for p in PRIMES} if lambda_pressure_geo else {str(p): 1.0 for p in PRIMES}
+        )
         for prime in PRIMES:
             key = str(prime)
             beta = lambda_geo_vec.get(key, 1.0)
             lambda_total = float(lambda_band or 1.0) * lambda_geo_vec.get(key, 1.0)
+            lambda_pressure_total = float(lambda_pressure_band or 1.0) * lambda_pressure_geo_vec.get(key, 1.0)
             residual_adjusted = residual_adjusted - beta * delta_T_vec.get(key, 0.0)
             residual_adjusted = residual_adjusted - lambda_total * delta_space_vec.get(key, 0.0)
+            residual_adjusted = residual_adjusted - lambda_pressure_total * delta_P_vec.get(key, 0.0)
         diff_r = residual_adjusted - target.residual_exp
         residual_loss = _loss_term(diff_r) * weights.w_r
 

@@ -40,6 +40,9 @@ class SubnetOptimizer:
         base_delta_space: PrimeVector,
         lambda_band: float,
         lambda_geo: PrimeVector,
+        base_delta_P: PrimeVector,
+        lambda_pressure_band: float,
+        lambda_pressure_geo: PrimeVector,
     ) -> None:
         self.simulator = simulator
         self.weights = weights
@@ -56,6 +59,9 @@ class SubnetOptimizer:
         self.base_delta_space = {str(p): float(base_delta_space.get(str(p), 0.0)) for p in PRIMES}
         self.lambda_band = float(lambda_band)
         self.lambda_geo = {str(p): float(lambda_geo.get(str(p), 1.0)) for p in PRIMES}
+        self.base_delta_P = {str(p): float(base_delta_P.get(str(p), 0.0)) for p in PRIMES}
+        self.lambda_pressure_band = float(lambda_pressure_band)
+        self.lambda_pressure_geo = {str(p): float(lambda_pressure_geo.get(str(p), 1.0)) for p in PRIMES}
 
     def optimise(self, target: SubnetTarget) -> OptimizationResult:
         best_params: Optional[SubnetParameters] = None
@@ -99,6 +105,8 @@ class SubnetOptimizer:
             k_skin=self.k_skin,
             lambda_band=params.lambda_band,
             lambda_geo=params.lambda_geo,
+            lambda_pressure_band=params.lambda_pressure_band,
+            lambda_pressure_geo=params.lambda_pressure_geo,
         )
         return loss, simulation_result
 
@@ -119,6 +127,10 @@ class SubnetOptimizer:
             )
             for p in PRIMES
         }
+        delta_P = {
+            str(p): self._clamp(self.base_delta_P.get(str(p), 0.0) + self.rng.gauss(0.0, 0.01), self.bounds.delta_P)
+            for p in PRIMES
+        }
         return SubnetParameters(
             L=L,
             f0=f0,
@@ -127,8 +139,11 @@ class SubnetOptimizer:
             layer_assignment=layer_assignment,
             delta_T=delta_T,
             delta_space=delta_space,
+            delta_P=delta_P,
             lambda_band=self.lambda_band,
             lambda_geo=self.lambda_geo,
+            lambda_pressure_band=self.lambda_pressure_band,
+            lambda_pressure_geo=self.lambda_pressure_geo,
         )
 
     def _perturb(self, params: SubnetParameters) -> SubnetParameters:
@@ -145,6 +160,7 @@ class SubnetOptimizer:
             candidate.delta_space[key] = self._clamp(
                 candidate.delta_space.get(key, 0.0) + self.rng.gauss(0.0, 0.01), self.bounds.delta_space
             )
+            candidate.delta_P[key] = self._clamp(candidate.delta_P.get(key, 0.0) + self.rng.gauss(0.0, 0.01), self.bounds.delta_P)
         candidate.layer_assignment = [
             max(1, min(candidate.L, layer + self.rng.choice([-1, 0, 1]))) for layer in candidate.layer_assignment
         ]

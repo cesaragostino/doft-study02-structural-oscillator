@@ -13,6 +13,7 @@ PRIMES: Tuple[int, int, int, int] = (2, 3, 5, 7)
 PRIME_KEYS: Tuple[str, str, str, str] = ("r2", "r3", "r5", "r7")
 DELTA_KEYS: Tuple[str, str, str, str] = ("d2", "d3", "d5", "d7")
 DEFAULT_LAMBDA_GEO: Tuple[float, float, float, float] = (1.0, 0.8, 0.4, 0.1)
+DEFAULT_LAMBDA_PRESSURE_GEO: Tuple[float, float, float, float] = (1.0, 0.8, 0.4, 0.1)
 PrimeVector = Dict[str, float]
 
 
@@ -25,6 +26,7 @@ class ParameterBounds:
     f0: Tuple[float, float] = (0.2, 50.0)
     delta_T: Tuple[float, float] = (-0.1, 0.1)
     delta_space: Tuple[float, float] = (-0.1, 0.1)
+    delta_P: Tuple[float, float] = (-0.1, 0.1)
 
     @classmethod
     def from_cli(cls, override: Optional[Dict[str, Iterable[float]]]) -> "ParameterBounds":
@@ -48,6 +50,7 @@ class ParameterBounds:
             f0=_pair("f0_bounds", cls.f0),
             delta_T=_pair("delta_T_bounds", cls.delta_T),
             delta_space=_pair("delta_space_bounds", cls.delta_space),
+            delta_P=_pair("delta_P_bounds", cls.delta_P),
         )
 
 
@@ -132,8 +135,11 @@ class SubnetParameters:
     layer_assignment: List[int] = field(default_factory=list)
     delta_T: PrimeVector = field(default_factory=dict)
     delta_space: PrimeVector = field(default_factory=dict)
+    delta_P: PrimeVector = field(default_factory=dict)
     lambda_band: float = 1.0
     lambda_geo: PrimeVector = field(default_factory=dict)
+    lambda_pressure_band: float = 1.0
+    lambda_pressure_geo: PrimeVector = field(default_factory=dict)
 
     def copy(self) -> "SubnetParameters":
         return SubnetParameters(
@@ -144,8 +150,11 @@ class SubnetParameters:
             layer_assignment=list(self.layer_assignment),
             delta_T=dict(self.delta_T),
             delta_space=dict(self.delta_space),
+            delta_P=dict(self.delta_P),
             lambda_band=self.lambda_band,
             lambda_geo=dict(self.lambda_geo),
+            lambda_pressure_band=self.lambda_pressure_band,
+            lambda_pressure_geo=dict(self.lambda_pressure_geo),
         )
 
 
@@ -162,14 +171,21 @@ class MaterialConfig:
     k_skin: float = 0.0
     delta_T: Dict[str, PrimeVector] = field(default_factory=dict)
     delta_space: Dict[str, PrimeVector] = field(default_factory=dict)
+    delta_P: Dict[str, PrimeVector] = field(default_factory=dict)
     lambda_band: Dict[str, float] = field(default_factory=dict)
     lambda_geo: PrimeVector = field(default_factory=dict)
+    lambda_pressure_band: Dict[str, float] = field(default_factory=dict)
+    lambda_pressure_geo: PrimeVector = field(default_factory=dict)
+    category: Optional[str] = None
 
     def delta_T_for(self, subnet: str) -> PrimeVector:
         return dict(self.delta_T.get(subnet, {}))
 
     def delta_space_for(self, subnet: str) -> PrimeVector:
         return dict(self.delta_space.get(subnet, {}))
+
+    def delta_P_for(self, subnet: str) -> PrimeVector:
+        return dict(self.delta_P.get(subnet, {}))
 
     def lambda_band_for(self, subnet: str) -> float:
         return float(self.lambda_band.get(subnet, 1.0))
@@ -179,6 +195,18 @@ class MaterialConfig:
             vec = {str(k): float(v) for k, v in self.lambda_geo.items() if isinstance(v, (int, float))}
         else:
             vec = {str(p): DEFAULT_LAMBDA_GEO[idx] for idx, p in enumerate(PRIMES)}
+        for prime in PRIMES:
+            vec.setdefault(str(prime), 1.0)
+        return vec
+
+    def lambda_pressure_band_for(self, subnet: str) -> float:
+        return float(self.lambda_pressure_band.get(subnet, 1.0))
+
+    def lambda_pressure_geo_vector(self) -> PrimeVector:
+        if self.lambda_pressure_geo:
+            vec = {str(k): float(v) for k, v in self.lambda_pressure_geo.items() if isinstance(v, (int, float))}
+        else:
+            vec = {str(p): DEFAULT_LAMBDA_PRESSURE_GEO[idx] for idx, p in enumerate(PRIMES)}
         for prime in PRIMES:
             vec.setdefault(str(prime), 1.0)
         return vec
@@ -214,6 +242,9 @@ class MaterialConfig:
         k_skin = 0.0
         if isinstance(data.get("k_skin"), (int, float)):
             k_skin = float(data["k_skin"])
+        category = data.get("category")
+        if category is not None:
+            category = str(category)
 
         def _clean_prime_vector(raw: object, fallback: PrimeVector) -> PrimeVector:
             vector = {str(p): fallback.get(str(p), 0.0) for p in PRIMES}
@@ -270,6 +301,21 @@ class MaterialConfig:
         lambda_geo = _clean_prime_vector(data.get("lambda_geo"), {str(p): DEFAULT_LAMBDA_GEO[idx] for idx, p in enumerate(PRIMES)})
         delta_T = _parse_vector_by_subnet(data.get("delta_T"), 0.0)
         delta_space = _parse_vector_by_subnet(data.get("delta_space"), 0.0)
+        delta_P = _parse_vector_by_subnet(data.get("delta_P"), 0.0)
+
+        raw_lambda_pressure_band = data.get("lambda_pressure_band")
+        lambda_pressure_band_map = {subnet: lambda_band_map.get(subnet, 1.0) for subnet in subnets}
+        if isinstance(raw_lambda_pressure_band, (int, float)) and math.isfinite(raw_lambda_pressure_band):
+            lambda_pressure_band_map = {subnet: float(raw_lambda_pressure_band) for subnet in subnets}
+        elif isinstance(raw_lambda_pressure_band, dict):
+            for subnet in subnets:
+                value = raw_lambda_pressure_band.get(subnet)
+                if isinstance(value, (int, float)) and math.isfinite(value):
+                    lambda_pressure_band_map[subnet] = float(value)
+
+        lambda_pressure_geo = _clean_prime_vector(
+            data.get("lambda_pressure_geo"), {str(p): DEFAULT_LAMBDA_PRESSURE_GEO[idx] for idx, p in enumerate(PRIMES)}
+        )
         return cls(
             material=material,
             subnets=subnets,
@@ -280,8 +326,12 @@ class MaterialConfig:
             k_skin=k_skin,
             delta_T=delta_T,
             delta_space=delta_space,
+            delta_P=delta_P,
             lambda_band=lambda_band_map,
             lambda_geo=lambda_geo,
+            lambda_pressure_band=lambda_pressure_band_map,
+            lambda_pressure_geo=lambda_pressure_geo,
+            category=category,
         )
 
 

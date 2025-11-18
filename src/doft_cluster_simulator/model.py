@@ -90,10 +90,12 @@ class ClusterSimulator:
         }
         delta_T = getattr(params, "delta_T", {}) or {}
         delta_space = getattr(params, "delta_space", {}) or {}
+        delta_P = getattr(params, "delta_P", {}) or {}
         for prime in PRIMES:
             key = str(prime)
             values[f"delta_T_{key}"] = delta_T.get(key, 0.0)
             values[f"delta_space_{key}"] = delta_space.get(key, 0.0)
+            values[f"delta_P_{key}"] = delta_P.get(key, 0.0)
         return values
 
     def set_optimizable_parameters(self, params: SubnetParameters, values: Dict[str, float]) -> None:
@@ -108,7 +110,10 @@ class ClusterSimulator:
             p_key = str(prime)
             key_T = f"delta_T_{p_key}"
             key_space = f"delta_space_{p_key}"
+            key_press = f"delta_P_{p_key}"
             if key_T in values:
                 params.delta_T[p_key] = values[key_T]
             if key_space in values:
                 params.delta_space[p_key] = values[key_space]
+            if key_press in values:
+                params.delta_P[p_key] = values[key_press]

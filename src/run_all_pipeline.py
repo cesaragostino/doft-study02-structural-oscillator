@@ -67,7 +67,7 @@ def load_all_materials(materials_csv: Path) -> List[str]:
     return sorted(df["name"].dropna().astype(str).unique().tolist())
 
 
-def build_sim_digest(runs_dir: Path, digest_dir: Path) -> None:
+def build_sim_digest(runs_dir: Path, digest_dir: Path, pressure_lookup: Optional[Dict[str, float]] = None) -> None:
     import json
     import pandas as pd
 
@@ -77,6 +77,8 @@ def build_sim_digest(runs_dir: Path, digest_dir: Path) -> None:
             data = json.load(fh)
         delta_T_values = {str(p): [] for p in PRIMES}
         delta_space_values = {str(p): [] for p in PRIMES}
+        delta_P_values = {str(p): [] for p in PRIMES}
+        material_name = data.get("material")
         best_params_path = manifest_path.parent / "best_params.json"
         if best_params_path.exists():
             try:
@@ -101,6 +103,15 @@ def build_sim_digest(runs_dir: Path, digest_dir: Path) -> None:
                             key = str(k)
                             if key in delta_space_values and isinstance(v, (int, float)):
                                 delta_space_values[key].append(float(v))
+                    dp = val.get("delta_P")
+                    if isinstance(dp, (int, float)):
+                        for prime in PRIMES:
+                            delta_P_values[str(prime)].append(float(dp))
+                    elif isinstance(dp, dict):
+                        for k, v in dp.items():
+                            key = str(k)
+                            if key in delta_P_values and isinstance(v, (int, float)):
+                                delta_P_values[key].append(float(v))
             except Exception:
                 pass
         delta_T_mean = {f"delta_T_mean_{p}": (sum(vals) / len(vals)) if vals else None for p, vals in delta_T_values.items()}
@@ -109,9 +120,15 @@ def build_sim_digest(runs_dir: Path, digest_dir: Path) -> None:
         delta_space_mean = {f"delta_space_mean_{p}": (sum(vals) / len(vals)) if vals else None for p, vals in delta_space_values.items()}
         delta_space_min = {f"delta_space_min_{p}": (min(vals) if vals else None) for p, vals in delta_space_values.items()}
         delta_space_max = {f"delta_space_max_{p}": (max(vals) if vals else None) for p, vals in delta_space_values.items()}
+        delta_P_mean = {f"delta_P_mean_{p}": (sum(vals) / len(vals)) if vals else None for p, vals in delta_P_values.items()}
+        delta_P_min = {f"delta_P_min_{p}": (min(vals) if vals else None) for p, vals in delta_P_values.items()}
+        delta_P_max = {f"delta_P_max_{p}": (max(vals) if vals else None) for p, vals in delta_P_values.items()}
+        pressure_val = None
+        if pressure_lookup and material_name in pressure_lookup:
+            pressure_val = pressure_lookup[material_name]
         rows.append(
             {
-                "material": data.get("material"),
+                "material": material_name,
                 "seed": data.get("seed"),
                 "max_evals": data.get("max_evals"),
                 "total_loss": data.get("total_loss"),
@@ -121,6 +138,10 @@ def build_sim_digest(runs_dir: Path, digest_dir: Path) -> None:
                 **delta_space_mean,
                 **delta_space_min,
                 **delta_space_max,
+                **delta_P_mean,
+                **delta_P_min,
+                **delta_P_max,
+                "pressure_GPa": pressure_val,
                 "weights_w_e": data.get("weights", {}).get("w_e"),
                 "weights_w_q": data.get("weights", {}).get("w_q"),
                 "weights_w_r": data.get("weights", {}).get("w_r"),
@@ -141,7 +162,7 @@ def build_sim_digest(runs_dir: Path, digest_dir: Path) -> None:
         df.to_excel(digest_dir / "simulator_summary.xlsx", index=False)
     except Exception:
         pass
-    value_cols = [col for col in df.columns if col.startswith("delta_T_") or col.startswith("delta_space_")]
+    value_cols = [col for col in df.columns if col.startswith("delta_T_") or col.startswith("delta_space_") or col.startswith("delta_P_")]
     if value_cols:
         material_summary = df.groupby("material")[value_cols].agg(["mean", "min", "max"])
         material_summary.columns = [f"{col}_{stat}" for col, stat in material_summary.columns]
@@ -160,6 +181,62 @@ def build_sim_digest(runs_dir: Path, digest_dir: Path) -> None:
                 pass
 
 
+def build_pressure_digest(noise_json: Path, sim_summary: Path, digest_dir: Path) -> None:
+    """Summarise pressure inputs and resulting delta_P values."""
+    import json
+    import pandas as pd
+    import numpy as np
+
+    if not noise_json.exists() or not sim_summary.exists():
+        return
+    data = json.loads(noise_json.read_text())
+    pressure_map = {}
+    for name, entry in data.items():
+        pressure_map[name] = float(entry.get("pressure_GPa", 0.0) or 0.0)
+    sim_df = pd.read_csv(sim_summary)
+    delta_cols = [col for col in sim_df.columns if col.startswith("delta_P_mean_")]
+    if not delta_cols:
+        return
+    agg = sim_df.groupby("material")[["total_loss"] + delta_cols].mean().reset_index()
+    agg["pressure_GPa"] = agg["material"].map(pressure_map).fillna(0.0)
+    # Correlation of pressure vs loss and deltas across materials
+    if len(agg) >= 2:
+        agg["corr_pressure_loss"] = np.corrcoef(agg["pressure_GPa"], agg["total_loss"])[0, 1] if agg["pressure_GPa"].std() > 0 else np.nan
+    else:
+        agg["corr_pressure_loss"] = np.nan
+    digest_dir.mkdir(parents=True, exist_ok=True)
+    agg.to_csv(digest_dir / "simulator_pressure_by_material.csv", index=False)
+
+
+def build_model_selection_metrics(sim_summary: Path, digest_dir: Path, model_label: str = "vector_pressure", k_params: int = 21) -> None:
+    import math
+    import pandas as pd
+
+    if not sim_summary.exists():
+        return
+    df = pd.read_csv(sim_summary)
+    if df.empty or "total_loss" not in df.columns:
+        return
+    n = len(df)
+    loss_sum = df["total_loss"].sum()
+    aic = 2 * k_params + loss_sum
+    bic = k_params * math.log(max(n, 1)) + loss_sum
+    out_df = pd.DataFrame(
+        [
+            {
+                "model": model_label,
+                "k_params": k_params,
+                "n_samples": n,
+                "total_loss": loss_sum,
+                "AIC_proxy": aic,
+                "BIC_proxy": bic,
+            }
+        ]
+    )
+    digest_dir.mkdir(parents=True, exist_ok=True)
+    out_df.to_csv(digest_dir / "model_selection_summary.csv", index=False)
+
+
 def copy_noise_digest(noise_csv: Path, digest_dir: Path) -> None:
     import pandas as pd
 
@@ -172,6 +249,62 @@ def copy_noise_digest(noise_csv: Path, digest_dir: Path) -> None:
         df.to_excel(digest_dir / "structural_noise_summary.xlsx", index=False)
     except Exception:
         pass
+
+
+def build_family_correlation(noise_csv: Path, sim_summary: Path, digest_dir: Path) -> None:
+    """Aggregate δT/δspace behaviour by family/category and correlate vs predicted_noise."""
+    import pandas as pd
+    import numpy as np
+
+    if not noise_csv.exists() or not sim_summary.exists():
+        return
+    noise_df = pd.read_csv(noise_csv)
+    noise_df["material"] = noise_df["name"].astype(str)
+    noise_df["family"] = noise_df.get("category", "Unknown").fillna("Unknown").astype(str)
+    sim_df = pd.read_csv(sim_summary)
+    delta_mean_cols = [
+        col for col in sim_df.columns if col.startswith("delta_T_mean_") or col.startswith("delta_space_mean_") or col.startswith("delta_P_mean_")
+    ]
+    if not delta_mean_cols:
+        return
+    sim_mat = sim_df.groupby("material")[delta_mean_cols].mean().reset_index()
+    merged = sim_mat.merge(noise_df[["material", "predicted_noise", "mismatch_mean", "M_struct_mean", "family"]], on="material", how="left")
+    merged["family"] = merged["family"].fillna("Unknown")
+    rows = []
+
+    def _corr(a: pd.Series, b: pd.Series) -> float | None:
+        paired = pd.concat([a, b], axis=1).dropna()
+        if len(paired) < 2:
+            return None
+        cval = paired.iloc[:, 0].corr(paired.iloc[:, 1])
+        return float(cval) if pd.notna(cval) else None
+
+    for family, g in merged.groupby("family"):
+        if len(g) == 0:
+            continue
+        entry = {
+            "family": family,
+            "material_count": len(g),
+            "predicted_noise_mean": g["predicted_noise"].mean(),
+            "mismatch_mean": g["mismatch_mean"].mean(),
+            "M_struct_mean": g["M_struct_mean"].mean(),
+        }
+        for prime in PRIMES:
+            dt_col = f"delta_T_mean_{prime}"
+            ds_col = f"delta_space_mean_{prime}"
+            if dt_col in g.columns:
+                entry[f"{dt_col}_mean"] = g[dt_col].mean()
+                entry[f"corr_noise_{dt_col}"] = _corr(g["predicted_noise"], g[dt_col])
+            if ds_col in g.columns:
+                entry[f"{ds_col}_mean"] = g[ds_col].mean()
+                entry[f"corr_noise_{ds_col}"] = _corr(g["predicted_noise"], g[ds_col])
+        rows.append(entry)
+    if not rows:
+        return
+    out_df = pd.DataFrame(rows)
+    out_df.sort_values(by="family", inplace=True)
+    digest_dir.mkdir(parents=True, exist_ok=True)
+    out_df.to_csv(digest_dir / "family_correlation_summary.csv", index=False)
 
 
 def build_config_digest(configs_dir: Path, digest_dir: Path, materials_csv: Path) -> None:
@@ -308,6 +441,17 @@ def inject_xi_into_configs(
             return 1.0
         return 1.0
 
+    def parse_lambda_pressure_band(raw: object, subnets: List[str], base_map: Dict[str, float]) -> Dict[str, float]:
+        result = dict(base_map)
+        if isinstance(raw, (int, float)):
+            return {subnet: float(raw) for subnet in subnets}
+        if isinstance(raw, dict):
+            for subnet in subnets:
+                val = raw.get(subnet)
+                if isinstance(val, (int, float)):
+                    result[subnet] = float(val)
+        return result
+
     for cfg_path in configs_dir.glob("material_config_*.json"):
         mat = cfg_path.stem.replace("material_config_", "")
         xi_entry = xi_map.get(mat)
@@ -315,8 +459,11 @@ def inject_xi_into_configs(
             continue
         delta_T_entry = None
         delta_space_entry = None
+        delta_P_entry = None
         lambda_band_entry: dict = {}
         lambda_geo_entry: dict = {}
+        lambda_pressure_band_entry: dict = {}
+        lambda_pressure_geo_entry: dict = {}
         # Backward compatibility: allow xi_entry to be a scalar
         if isinstance(xi_entry, (int, float)):
             xi_value = float(xi_entry)
@@ -328,8 +475,11 @@ def inject_xi_into_configs(
             k_skin = float(xi_entry.get("k_skin", 0.0))
             delta_T_entry = xi_entry.get("delta_T", None)
             delta_space_entry = xi_entry.get("delta_space", None)
+            delta_P_entry = xi_entry.get("delta_P", None)
             lambda_band_entry = xi_entry.get("lambda_band", {})
             lambda_geo_entry = xi_entry.get("lambda_geo", {})
+            lambda_pressure_band_entry = xi_entry.get("lambda_pressure_band", {})
+            lambda_pressure_geo_entry = xi_entry.get("lambda_pressure_geo", {})
         else:
             continue
         if xi_value is None:
@@ -341,11 +491,16 @@ def inject_xi_into_configs(
         subnets = data.get("subnets", [])
         if not subnets:
             continue
+        if "category" not in data and isinstance(xi_entry, dict):
+            if "category" in xi_entry:
+                data["category"] = xi_entry["category"]
         xi_sign = derive_signs([str(s) for s in subnets])
         config_delta_T = parse_delta_block(data.get("delta_T"), subnets, default_delta_T)
         config_delta_space = parse_delta_block(data.get("delta_space"), subnets, default_delta_space)
+        config_delta_P = parse_delta_block(data.get("delta_P"), subnets, 0.0)
         delta_T_map = parse_delta_block(delta_T_entry, subnets, default_delta_T) if delta_T_entry is not None else config_delta_T
         delta_space_map = parse_delta_block(delta_space_entry, subnets, default_delta_space) if delta_space_entry is not None else config_delta_space
+        delta_P_map = parse_delta_block(delta_P_entry, subnets, 0.0) if delta_P_entry is not None else config_delta_P
         lambda_band_map = {subnet: infer_lambda_band(subnet) for subnet in subnets}
         if isinstance(data.get("lambda_band"), dict):
             for subnet, value in data["lambda_band"].items():
@@ -360,6 +515,12 @@ def inject_xi_into_configs(
             for k, v in data["lambda_geo"].items():
                 if str(k) in lambda_geo_map and isinstance(v, (int, float)):
                     lambda_geo_map[str(k)] = float(v)
+        lambda_pressure_band_map = parse_lambda_pressure_band(lambda_pressure_band_entry, subnets, lambda_band_map)
+        lambda_pressure_geo_map = build_prime_vector(lambda_pressure_geo_entry, 1.0)
+        if isinstance(data.get("lambda_pressure_geo"), dict):
+            for k, v in data["lambda_pressure_geo"].items():
+                if str(k) in lambda_pressure_geo_map and isinstance(v, (int, float)):
+                    lambda_pressure_geo_map[str(k)] = float(v)
         data["xi"] = float(xi_value)
         data["xi_sign"] = xi_sign
         if xi_exp:
@@ -370,8 +531,11 @@ def inject_xi_into_configs(
             data["k_skin"] = data.get("k_skin", k_skin)
         data["delta_T"] = delta_T_map
         data["delta_space"] = delta_space_map
+        data["delta_P"] = delta_P_map
         data["lambda_band"] = lambda_band_map
         data["lambda_geo"] = lambda_geo_map
+        data["lambda_pressure_band"] = lambda_pressure_band_map
+        data["lambda_pressure_geo"] = lambda_pressure_geo_map
         cfg_path.write_text(json.dumps(data, indent=2))
 
 
@@ -408,6 +572,18 @@ def main() -> None:
         type=float,
         default=0.0,
         help="Default spatial expansion per material (passed to structural noise calc)",
+    )
+    parser.add_argument(
+        "--c-pressure",
+        type=float,
+        default=0.01,
+        help="Global factor for pressure-induced delta_P initialisation",
+    )
+    parser.add_argument(
+        "--pressure-ref",
+        type=float,
+        default=1.0,
+        help="Reference pressure (GPa) for delta_P normalisation",
     )
     args = parser.parse_args()
 
@@ -483,6 +659,8 @@ def main() -> None:
             noise_cmd += ["--materials", *materials]
         noise_cmd += ["--default-delta-T", str(args.default_delta_T)]
         noise_cmd += ["--default-delta-space", str(args.default_delta_space)]
+        noise_cmd += ["--c-pressure", str(args.c_pressure)]
+        noise_cmd += ["--pressure-ref", str(args.pressure_ref)]
         run_cmd(noise_cmd, cwd=Path("."))
         if noise_json.exists():
             import json as _json
@@ -530,10 +708,14 @@ def main() -> None:
 
     # 4) Build digests for configs, simulator, and structural noise
     build_config_digest(configs_dir, digest_dir, args.materials_csv)
+    sim_summary_path = digest_dir / "simulator_summary.csv"
     if not args.skip_simulator:
-        build_sim_digest(runs_dir, digest_dir)
+        build_sim_digest(runs_dir, digest_dir, {m: (xi_map.get(m, {}).get("pressure_GPa", 0.0) if isinstance(xi_map.get(m), dict) else 0.0) for m in xi_map} if xi_map else None)
+        build_model_selection_metrics(sim_summary_path, digest_dir, model_label="vector_pressure")
     if not args.skip_noise:
         copy_noise_digest(noise_csv, digest_dir)
+        build_family_correlation(noise_csv, sim_summary_path, digest_dir)
+        build_pressure_digest(noise_json, sim_summary_path, digest_dir)
 
     print(f"Pipeline completed. Outputs under: {output_root}")
 

@@ -103,6 +103,8 @@ def _parse_bounds_override(entries: Optional[list[str]]) -> Optional[dict[str, t
             data["delta_T_bounds"] = pair
         elif key_name in {"delta_space", "delta_space_bounds", "deltaspace"}:
             data["delta_space_bounds"] = pair
+        elif key_name in {"delta_p", "delta_p_bounds", "pressure", "pressure_bounds"}:
+            data["delta_P_bounds"] = pair
     return data or None
 
 
