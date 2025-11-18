@@ -740,13 +740,21 @@ def main() -> None:
     # 4) Build digests for configs, simulator, and structural noise
     build_config_digest(configs_dir, digest_dir, args.materials_csv)
     sim_summary_path = digest_dir / "simulator_summary.csv"
+    pressure_lookup = dict(pressure_map)
+    if xi_map:
+        for m, entry in xi_map.items():
+            if isinstance(entry, dict) and "pressure_GPa" in entry:
+                try:
+                    pressure_lookup[m] = float(entry["pressure_GPa"])
+                except Exception:
+                    pass
     if not args.skip_simulator:
-        build_sim_digest(runs_dir, digest_dir, {m: (xi_map.get(m, {}).get("pressure_GPa", 0.0) if isinstance(xi_map.get(m), dict) else 0.0) for m in xi_map} if xi_map else pressure_map)
+        build_sim_digest(runs_dir, digest_dir, pressure_lookup)
         build_model_selection_metrics(sim_summary_path, digest_dir, model_label="vector_pressure")
     if not args.skip_noise:
         copy_noise_digest(noise_csv, digest_dir)
         build_family_correlation(noise_csv, sim_summary_path, digest_dir)
-        build_pressure_digest(noise_json, sim_summary_path, digest_dir, pressure_map)
+        build_pressure_digest(noise_json, sim_summary_path, digest_dir, pressure_lookup)
 
     print(f"Pipeline completed. Outputs under: {output_root}")
 
