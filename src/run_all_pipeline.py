@@ -67,6 +67,29 @@ def load_all_materials(materials_csv: Path) -> List[str]:
     return sorted(df["name"].dropna().astype(str).unique().tolist())
 
 
+def load_pressure_map(materials_csv: Path) -> Dict[str, float]:
+    import pandas as pd
+
+    if not materials_csv.exists():
+        return {}
+    df = pd.read_csv(materials_csv)
+    if "name" not in df.columns:
+        return {}
+    pressure_col = "pressure_GPa" if "pressure_GPa" in df.columns else None
+    mapping = {}
+    for row in df.itertuples():
+        name = str(getattr(row, "name"))
+        if pressure_col:
+            try:
+                pressure_val = float(getattr(row, "pressure_GPa"))
+            except Exception:
+                pressure_val = 0.0
+        else:
+            pressure_val = 0.0
+        mapping[name] = pressure_val
+    return mapping
+
+
 def build_sim_digest(runs_dir: Path, digest_dir: Path, pressure_lookup: Optional[Dict[str, float]] = None) -> None:
     import json
     import pandas as pd
@@ -181,29 +204,36 @@ def build_sim_digest(runs_dir: Path, digest_dir: Path, pressure_lookup: Optional
                 pass
 
 
-def build_pressure_digest(noise_json: Path, sim_summary: Path, digest_dir: Path) -> None:
+def build_pressure_digest(noise_json: Path, sim_summary: Path, digest_dir: Path, pressure_map: Optional[Dict[str, float]]) -> None:
     """Summarise pressure inputs and resulting delta_P values."""
     import json
     import pandas as pd
     import numpy as np
 
-    if not noise_json.exists() or not sim_summary.exists():
+    if not sim_summary.exists():
         return
-    data = json.loads(noise_json.read_text())
-    pressure_map = {}
-    for name, entry in data.items():
-        pressure_map[name] = float(entry.get("pressure_GPa", 0.0) or 0.0)
+    if pressure_map is None:
+        pressure_map = {}
+    if noise_json.exists():
+        try:
+            data = json.loads(noise_json.read_text())
+            for name, entry in data.items():
+                if name not in pressure_map:
+                    pressure_map[name] = float(entry.get("pressure_GPa", 0.0) or 0.0)
+        except Exception:
+            pass
+
     sim_df = pd.read_csv(sim_summary)
     delta_cols = [col for col in sim_df.columns if col.startswith("delta_P_mean_")]
     if not delta_cols:
         return
     agg = sim_df.groupby("material")[["total_loss"] + delta_cols].mean().reset_index()
     agg["pressure_GPa"] = agg["material"].map(pressure_map).fillna(0.0)
-    # Correlation of pressure vs loss and deltas across materials
-    if len(agg) >= 2:
-        agg["corr_pressure_loss"] = np.corrcoef(agg["pressure_GPa"], agg["total_loss"])[0, 1] if agg["pressure_GPa"].std() > 0 else np.nan
-    else:
-        agg["corr_pressure_loss"] = np.nan
+    corr = np.nan
+    if len(agg) >= 2 and agg["pressure_GPa"].std() > 0 and agg["total_loss"].std() > 0:
+        corr = np.corrcoef(agg["pressure_GPa"], agg["total_loss"])[0, 1]
+    agg["corr_pressure_loss"] = corr if not np.isnan(corr) else 0.0
+    agg["corr_pressure_note"] = "" if not np.isnan(corr) else "insufficient_pressure_variation_or_data"
     digest_dir.mkdir(parents=True, exist_ok=True)
     agg.to_csv(digest_dir / "simulator_pressure_by_material.csv", index=False)
 
@@ -592,6 +622,7 @@ def main() -> None:
     runs_dir = output_root / "runs"
     noise_dir = output_root / "structural_noise"
     digest_dir = output_root / "digest"
+    pressure_map = load_pressure_map(args.materials_csv)
     configs_dir.mkdir(parents=True, exist_ok=True)
     runs_dir.mkdir(parents=True, exist_ok=True)
     if not args.skip_noise:
@@ -710,12 +741,12 @@ def main() -> None:
     build_config_digest(configs_dir, digest_dir, args.materials_csv)
     sim_summary_path = digest_dir / "simulator_summary.csv"
     if not args.skip_simulator:
-        build_sim_digest(runs_dir, digest_dir, {m: (xi_map.get(m, {}).get("pressure_GPa", 0.0) if isinstance(xi_map.get(m), dict) else 0.0) for m in xi_map} if xi_map else None)
+        build_sim_digest(runs_dir, digest_dir, {m: (xi_map.get(m, {}).get("pressure_GPa", 0.0) if isinstance(xi_map.get(m), dict) else 0.0) for m in xi_map} if xi_map else pressure_map)
         build_model_selection_metrics(sim_summary_path, digest_dir, model_label="vector_pressure")
     if not args.skip_noise:
         copy_noise_digest(noise_csv, digest_dir)
         build_family_correlation(noise_csv, sim_summary_path, digest_dir)
-        build_pressure_digest(noise_json, sim_summary_path, digest_dir)
+        build_pressure_digest(noise_json, sim_summary_path, digest_dir, pressure_map)
 
     print(f"Pipeline completed. Outputs under: {output_root}")
 
