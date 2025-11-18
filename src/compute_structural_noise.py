@@ -31,6 +31,7 @@ MEV_TO_K = 11.6045
 EV_TO_K = 11604.5
 RATIO_KEYS: Tuple[str, str, str] = ("th_to_delta", "delta_to_theta", "theta_to_ef")
 PRIME_STR: Tuple[str, str, str, str] = tuple(str(p) for p in PRIMES)
+DEFAULT_LAMBDA_GEO: Tuple[float, float, float, float] = (1.0, 0.8, 0.4, 0.1)
 
 
 # ---- primitive helpers -----------------------------------------------------
@@ -150,6 +151,53 @@ def compute_pair_metrics(
         used_terms += 1
 
     return mismatch_total, mstruct, used_terms, exp_diffs_sum, exp_diffs_count
+
+
+def infer_lambda_band(subnet: str) -> float:
+    lower = subnet.lower()
+    if "pi" in lower:
+        return 0.8
+    if "sigma" in lower:
+        return 1.0
+    return 1.0
+
+
+def build_decay_vector(exp_diff_mean: Sequence[float], target_sum: float, lambda_geo: Sequence[float]) -> Dict[str, float]:
+    """Create a prime-indexed vector that decays towards the core."""
+
+    # Prefer the observed exponent diff profile; fall back to a generic skin-heavy profile.
+    weights = np.array(exp_diff_mean, dtype=float)
+    if not np.any(weights):
+        weights = np.array([1.0, 0.8, 0.4, 0.2], dtype=float)
+    geo = np.array(lambda_geo, dtype=float)
+    weights = np.maximum(weights * geo, 1e-6)
+    weights = weights / max(weights.sum(), 1e-6)
+    values = np.clip(weights * target_sum, -0.1, 0.1)
+    return {str(prime): float(values[idx]) for idx, prime in enumerate(PRIMES)}
+
+
+def initialise_delta_vectors(
+    subnets: Sequence[str],
+    exp_diff_mean: Sequence[float],
+    mismatch_mean: float,
+    lambda_geo_vec: Sequence[float],
+    default_delta_T: float = 0.0,
+    default_delta_space: float = 0.0,
+) -> Tuple[Dict[str, Dict[str, float]], Dict[str, Dict[str, float]], Dict[str, float]]:
+    """Generate decaying δT/δspace vectors per subnet plus lambda_band defaults."""
+
+    # Scale magnitude using both mismatch level and how many ratios contributed.
+    base = 0.015
+    mismatch_term = min(max(mismatch_mean, 0.0) * 0.005, 0.02)
+    exp_term = min(sum(exp_diff_mean) * 0.0015, 0.02)
+    target_sum = min(0.05, max(abs(default_delta_T), base + mismatch_term + exp_term))
+    space_sum = min(0.05, max(abs(default_delta_space), target_sum * 0.7))
+    delta_T_vec = build_decay_vector(exp_diff_mean, target_sum, lambda_geo_vec)
+    delta_space_vec = build_decay_vector(exp_diff_mean, space_sum, lambda_geo_vec)
+    subnet_delta_T = {subnet: dict(delta_T_vec) for subnet in subnets}
+    subnet_delta_space = {subnet: dict(delta_space_vec) for subnet in subnets}
+    lambda_band_map = {subnet: infer_lambda_band(subnet) for subnet in subnets}
+    return subnet_delta_T, subnet_delta_space, lambda_band_map
 
 
 # ---- main pipeline ---------------------------------------------------------
@@ -279,6 +327,7 @@ def run(args: argparse.Namespace) -> None:
     if not summaries:
         print("No multiband materials found with the given filters.")
         return
+    subnet_lookup = {entry["name"]: entry.get("subnets", []) for entry in summaries}
 
     summary_df = pd.DataFrame(summaries)
 
@@ -322,26 +371,36 @@ def run(args: argparse.Namespace) -> None:
         col_name = f"xi_exp_{prime}"
         summary_df[col_name] = summary_df[f"exp_diff_mean_{prime}"] * k_exp[str(prime)]
     summary_df["k_skin"] = args.k_skin
-    summary_df["delta_T"] = args.default_delta_T
-    summary_df["delta_space"] = args.default_delta_space
 
     # Serialization
     output_csv = Path(args.output_csv)
     output_csv.parent.mkdir(parents=True, exist_ok=True)
     # The CSV is meant as a human/readable summary; keep surface/expansion params only in JSON to avoid confusion.
-    csv_df = summary_df.drop(columns=["delta_T", "delta_space"], errors="ignore")
-    csv_df.to_csv(output_csv, index=False)
+    summary_df.to_csv(output_csv, index=False)
 
     if args.output_json:
         mapping = {}
         for row in summary_df.itertuples():
             xi_exp = {str(p): getattr(row, f"xi_exp_{p}") for p in PRIMES}
+            exp_diff_mean = [getattr(row, f"exp_diff_mean_{p}") for p in PRIMES]
+            subnets = subnet_lookup.get(row.name, []) or ["default"]
+            subnet_delta_T, subnet_delta_space, lambda_band_map = initialise_delta_vectors(
+                subnets,
+                exp_diff_mean,
+                float(row.mismatch_mean),
+                DEFAULT_LAMBDA_GEO,
+                default_delta_T=args.default_delta_T,
+                default_delta_space=args.default_delta_space,
+            )
             mapping[row.name] = {
                 "xi": row.predicted_noise,
                 "xi_exp": xi_exp,
                 "k_skin": args.k_skin,
-                "delta_T": args.default_delta_T,
-                "delta_space": args.default_delta_space,
+                "delta_T": subnet_delta_T,
+                "delta_space": subnet_delta_space,
+                "lambda_band": lambda_band_map,
+                "lambda_geo": {str(p): DEFAULT_LAMBDA_GEO[idx] for idx, p in enumerate(PRIMES)},
+                "subnets": subnets,
             }
         out_json = Path(args.output_json)
         out_json.parent.mkdir(parents=True, exist_ok=True)

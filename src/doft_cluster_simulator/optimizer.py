@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 import random
 
-from .data import DELTA_KEYS, PRIME_KEYS, LossWeights, ParameterBounds, SubnetParameters, SubnetTarget
+from .data import DELTA_KEYS, PRIME_KEYS, PRIMES, LossWeights, ParameterBounds, PrimeVector, SubnetParameters, SubnetTarget
 from .loss import LossBreakdown, compute_subnet_loss
 from .model import ClusterSimulator
 
@@ -36,8 +36,10 @@ class SubnetOptimizer:
         xi_sign: int,
         xi_exp: Optional[dict],
         k_skin: float,
-        base_delta_T: float = 0.0,
-        base_delta_space: float = 0.0,
+        base_delta_T: PrimeVector,
+        base_delta_space: PrimeVector,
+        lambda_band: float,
+        lambda_geo: PrimeVector,
     ) -> None:
         self.simulator = simulator
         self.weights = weights
@@ -50,8 +52,10 @@ class SubnetOptimizer:
         self.xi_sign = xi_sign
         self.xi_exp = xi_exp or {}
         self.k_skin = k_skin
-        self.base_delta_T = base_delta_T
-        self.base_delta_space = base_delta_space
+        self.base_delta_T = {str(p): float(base_delta_T.get(str(p), 0.0)) for p in PRIMES}
+        self.base_delta_space = {str(p): float(base_delta_space.get(str(p), 0.0)) for p in PRIMES}
+        self.lambda_band = float(lambda_band)
+        self.lambda_geo = {str(p): float(lambda_geo.get(str(p), 1.0)) for p in PRIMES}
 
     def optimise(self, target: SubnetTarget) -> OptimizationResult:
         best_params: Optional[SubnetParameters] = None
@@ -93,8 +97,8 @@ class SubnetOptimizer:
             xi_sign=self.xi_sign,
             xi_exp=self.xi_exp,
             k_skin=self.k_skin,
-            delta_T=params.delta_T,
-            delta_space=params.delta_space,
+            lambda_band=params.lambda_band,
+            lambda_geo=params.lambda_geo,
         )
         return loss, simulation_result
 
@@ -105,10 +109,26 @@ class SubnetOptimizer:
         ratios = {key: self.rng.uniform(*self.bounds.ratios) for key in PRIME_KEYS}
         delta = {key: self.rng.uniform(*self.bounds.deltas) for key in DELTA_KEYS}
         layer_assignment = [self.rng.randint(1, L) for _ in PRIME_KEYS]
-        delta_T = self.base_delta_T + self.rng.gauss(0.0, 0.01)
-        delta_space = self.base_delta_space + self.rng.gauss(0.0, 0.01)
+        delta_T = {
+            str(p): self._clamp(self.base_delta_T.get(str(p), 0.0) + self.rng.gauss(0.0, 0.01), self.bounds.delta_T)
+            for p in PRIMES
+        }
+        delta_space = {
+            str(p): self._clamp(
+                self.base_delta_space.get(str(p), 0.0) + self.rng.gauss(0.0, 0.01), self.bounds.delta_space
+            )
+            for p in PRIMES
+        }
         return SubnetParameters(
-            L=L, f0=f0, ratios=ratios, delta=delta, layer_assignment=layer_assignment, delta_T=delta_T, delta_space=delta_space
+            L=L,
+            f0=f0,
+            ratios=ratios,
+            delta=delta,
+            layer_assignment=layer_assignment,
+            delta_T=delta_T,
+            delta_space=delta_space,
+            lambda_band=self.lambda_band,
+            lambda_geo=self.lambda_geo,
         )
 
     def _perturb(self, params: SubnetParameters) -> SubnetParameters:
@@ -119,8 +139,12 @@ class SubnetOptimizer:
             candidate.ratios[key] = self._clamp(candidate.ratios[key] + self.rng.gauss(0.0, 0.05), self.bounds.ratios)
         for key in DELTA_KEYS:
             candidate.delta[key] = self._clamp(candidate.delta[key] + self.rng.gauss(0.0, 0.02), self.bounds.deltas)
-        candidate.delta_T = candidate.delta_T + self.rng.gauss(0.0, 0.01)
-        candidate.delta_space = candidate.delta_space + self.rng.gauss(0.0, 0.01)
+        for prime in PRIMES:
+            key = str(prime)
+            candidate.delta_T[key] = self._clamp(candidate.delta_T.get(key, 0.0) + self.rng.gauss(0.0, 0.01), self.bounds.delta_T)
+            candidate.delta_space[key] = self._clamp(
+                candidate.delta_space.get(key, 0.0) + self.rng.gauss(0.0, 0.01), self.bounds.delta_space
+            )
         candidate.layer_assignment = [
             max(1, min(candidate.L, layer + self.rng.choice([-1, 0, 1]))) for layer in candidate.layer_assignment
         ]

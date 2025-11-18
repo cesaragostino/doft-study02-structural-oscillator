@@ -77,7 +77,7 @@ class ClusterSimulator:
 
     # Expose optimizable parameters for downstream optimizers
     def get_optimizable_parameters(self, params: SubnetParameters) -> Dict[str, float]:
-        return {
+        values = {
             "f0": params.f0,
             "r2": params.ratios.get("r2", 0.0),
             "r3": params.ratios.get("r3", 0.0),
@@ -87,9 +87,14 @@ class ClusterSimulator:
             "d3": params.delta.get("d3", 0.0),
             "d5": params.delta.get("d5", 0.0),
             "d7": params.delta.get("d7", 0.0),
-            "delta_T": getattr(params, "delta_T", 0.0),
-            "delta_space": getattr(params, "delta_space", 0.0),
         }
+        delta_T = getattr(params, "delta_T", {}) or {}
+        delta_space = getattr(params, "delta_space", {}) or {}
+        for prime in PRIMES:
+            key = str(prime)
+            values[f"delta_T_{key}"] = delta_T.get(key, 0.0)
+            values[f"delta_space_{key}"] = delta_space.get(key, 0.0)
+        return values
 
     def set_optimizable_parameters(self, params: SubnetParameters, values: Dict[str, float]) -> None:
         params.f0 = values.get("f0", params.f0)
@@ -99,7 +104,11 @@ class ClusterSimulator:
         for key in ("d2", "d3", "d5", "d7"):
             if key in values:
                 params.delta[key] = values[key]
-        if "delta_T" in values:
-            params.delta_T = values["delta_T"]
-        if "delta_space" in values:
-            params.delta_space = values["delta_space"]
+        for prime in PRIMES:
+            p_key = str(prime)
+            key_T = f"delta_T_{p_key}"
+            key_space = f"delta_space_{p_key}"
+            if key_T in values:
+                params.delta_T[p_key] = values[key_T]
+            if key_space in values:
+                params.delta_space[p_key] = values[key_space]

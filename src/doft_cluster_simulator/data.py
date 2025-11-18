@@ -12,6 +12,8 @@ import math
 PRIMES: Tuple[int, int, int, int] = (2, 3, 5, 7)
 PRIME_KEYS: Tuple[str, str, str, str] = ("r2", "r3", "r5", "r7")
 DELTA_KEYS: Tuple[str, str, str, str] = ("d2", "d3", "d5", "d7")
+DEFAULT_LAMBDA_GEO: Tuple[float, float, float, float] = (1.0, 0.8, 0.4, 0.1)
+PrimeVector = Dict[str, float]
 
 
 @dataclass
@@ -21,6 +23,8 @@ class ParameterBounds:
     ratios: Tuple[float, float] = (0.0, 1.5)
     deltas: Tuple[float, float] = (-0.25, 0.25)
     f0: Tuple[float, float] = (0.2, 50.0)
+    delta_T: Tuple[float, float] = (-0.1, 0.1)
+    delta_space: Tuple[float, float] = (-0.1, 0.1)
 
     @classmethod
     def from_cli(cls, override: Optional[Dict[str, Iterable[float]]]) -> "ParameterBounds":
@@ -42,6 +46,8 @@ class ParameterBounds:
             ratios=_pair("ratios_bounds", cls.ratios),
             deltas=_pair("deltas_bounds", cls.deltas),
             f0=_pair("f0_bounds", cls.f0),
+            delta_T=_pair("delta_T_bounds", cls.delta_T),
+            delta_space=_pair("delta_space_bounds", cls.delta_space),
         )
 
 
@@ -124,8 +130,10 @@ class SubnetParameters:
     ratios: Dict[str, float] = field(default_factory=dict)
     delta: Dict[str, float] = field(default_factory=dict)
     layer_assignment: List[int] = field(default_factory=list)
-    delta_T: float = 0.0
-    delta_space: float = 0.0
+    delta_T: PrimeVector = field(default_factory=dict)
+    delta_space: PrimeVector = field(default_factory=dict)
+    lambda_band: float = 1.0
+    lambda_geo: PrimeVector = field(default_factory=dict)
 
     def copy(self) -> "SubnetParameters":
         return SubnetParameters(
@@ -134,8 +142,10 @@ class SubnetParameters:
             ratios=dict(self.ratios),
             delta=dict(self.delta),
             layer_assignment=list(self.layer_assignment),
-            delta_T=self.delta_T,
-            delta_space=self.delta_space,
+            delta_T=dict(self.delta_T),
+            delta_space=dict(self.delta_space),
+            lambda_band=self.lambda_band,
+            lambda_geo=dict(self.lambda_geo),
         )
 
 
@@ -150,8 +160,28 @@ class MaterialConfig:
     xi_exp: Dict[str, float] = field(default_factory=dict)
     xi_sign: Dict[str, int] = field(default_factory=dict)
     k_skin: float = 0.0
-    delta_T: float = 0.0
-    delta_space: float = 0.0
+    delta_T: Dict[str, PrimeVector] = field(default_factory=dict)
+    delta_space: Dict[str, PrimeVector] = field(default_factory=dict)
+    lambda_band: Dict[str, float] = field(default_factory=dict)
+    lambda_geo: PrimeVector = field(default_factory=dict)
+
+    def delta_T_for(self, subnet: str) -> PrimeVector:
+        return dict(self.delta_T.get(subnet, {}))
+
+    def delta_space_for(self, subnet: str) -> PrimeVector:
+        return dict(self.delta_space.get(subnet, {}))
+
+    def lambda_band_for(self, subnet: str) -> float:
+        return float(self.lambda_band.get(subnet, 1.0))
+
+    def lambda_geo_vector(self) -> PrimeVector:
+        if self.lambda_geo:
+            vec = {str(k): float(v) for k, v in self.lambda_geo.items() if isinstance(v, (int, float))}
+        else:
+            vec = {str(p): DEFAULT_LAMBDA_GEO[idx] for idx, p in enumerate(PRIMES)}
+        for prime in PRIMES:
+            vec.setdefault(str(prime), 1.0)
+        return vec
 
     @classmethod
     def from_file(cls, path: Path) -> "MaterialConfig":
@@ -184,12 +214,62 @@ class MaterialConfig:
         k_skin = 0.0
         if isinstance(data.get("k_skin"), (int, float)):
             k_skin = float(data["k_skin"])
-        delta_T = 0.0
-        if isinstance(data.get("delta_T"), (int, float)):
-            delta_T = float(data["delta_T"])
-        delta_space = 0.0
-        if isinstance(data.get("delta_space"), (int, float)):
-            delta_space = float(data["delta_space"])
+
+        def _clean_prime_vector(raw: object, fallback: PrimeVector) -> PrimeVector:
+            vector = {str(p): fallback.get(str(p), 0.0) for p in PRIMES}
+            if raw is None:
+                return vector
+            if isinstance(raw, (int, float)) and math.isfinite(raw):
+                return {str(p): float(raw) for p in PRIMES}
+            if isinstance(raw, dict):
+                for k, v in raw.items():
+                    key = str(k)
+                    if key not in vector:
+                        continue
+                    if isinstance(v, (int, float)) and math.isfinite(v):
+                        vector[key] = float(v)
+            return vector
+
+        def _parse_vector_by_subnet(raw: object, default_value: float = 0.0) -> Dict[str, PrimeVector]:
+            base_zero = {str(p): default_value for p in PRIMES}
+            out: Dict[str, PrimeVector] = {subnet: dict(base_zero) for subnet in subnets}
+            if raw is None:
+                return out
+            if isinstance(raw, (int, float)):
+                shared = _clean_prime_vector(raw, base_zero)
+                return {subnet: dict(shared) for subnet in subnets}
+            if isinstance(raw, dict):
+                has_subnet_keys = any(str(k) in subnets for k in raw.keys())
+                if has_subnet_keys:
+                    for subnet in subnets:
+                        if subnet in raw:
+                            out[subnet] = _clean_prime_vector(raw[subnet], base_zero)
+                    return out
+                shared = _clean_prime_vector(raw, base_zero)
+                return {subnet: dict(shared) for subnet in subnets}
+            return out
+
+        def _infer_lambda_band(subnet: str) -> float:
+            lower = subnet.lower()
+            if "pi" in lower:
+                return 0.8
+            if "sigma" in lower:
+                return 1.0
+            return 1.0
+
+        raw_lambda_band = data.get("lambda_band")
+        lambda_band_map = {subnet: _infer_lambda_band(subnet) for subnet in subnets}
+        if isinstance(raw_lambda_band, (int, float)) and math.isfinite(raw_lambda_band):
+            lambda_band_map = {subnet: float(raw_lambda_band) for subnet in subnets}
+        elif isinstance(raw_lambda_band, dict):
+            for subnet in subnets:
+                value = raw_lambda_band.get(subnet)
+                if isinstance(value, (int, float)) and math.isfinite(value):
+                    lambda_band_map[subnet] = float(value)
+
+        lambda_geo = _clean_prime_vector(data.get("lambda_geo"), {str(p): DEFAULT_LAMBDA_GEO[idx] for idx, p in enumerate(PRIMES)})
+        delta_T = _parse_vector_by_subnet(data.get("delta_T"), 0.0)
+        delta_space = _parse_vector_by_subnet(data.get("delta_space"), 0.0)
         return cls(
             material=material,
             subnets=subnets,
@@ -200,6 +280,8 @@ class MaterialConfig:
             k_skin=k_skin,
             delta_T=delta_T,
             delta_space=delta_space,
+            lambda_band=lambda_band_map,
+            lambda_geo=lambda_geo,
         )
 
 

@@ -22,6 +22,8 @@ import subprocess
 from pathlib import Path
 from typing import List, Optional
 
+from doft_cluster_simulator.data import PRIMES
+
 
 def run_cmd(cmd: List[str], cwd: Path) -> None:
     result = subprocess.run(cmd, cwd=str(cwd))
@@ -73,34 +75,52 @@ def build_sim_digest(runs_dir: Path, digest_dir: Path) -> None:
     for manifest_path in runs_dir.rglob("manifest.json"):
         with manifest_path.open() as fh:
             data = json.load(fh)
-        delta_T_mean = None
-        delta_T_min = None
-        delta_T_max = None
+        delta_T_values = {str(p): [] for p in PRIMES}
+        delta_space_values = {str(p): [] for p in PRIMES}
         best_params_path = manifest_path.parent / "best_params.json"
         if best_params_path.exists():
             try:
                 best = json.loads(best_params_path.read_text())
                 params = best.get("params", {})
-                delta_ts = []
                 for val in params.values():
                     dt = val.get("delta_T")
+                    ds = val.get("delta_space")
                     if isinstance(dt, (int, float)):
-                        delta_ts.append(float(dt))
-                if delta_ts:
-                    delta_T_mean = float(sum(delta_ts) / len(delta_ts))
-                    delta_T_min = float(min(delta_ts))
-                    delta_T_max = float(max(delta_ts))
+                        for prime in PRIMES:
+                            delta_T_values[str(prime)].append(float(dt))
+                    elif isinstance(dt, dict):
+                        for k, v in dt.items():
+                            key = str(k)
+                            if key in delta_T_values and isinstance(v, (int, float)):
+                                delta_T_values[key].append(float(v))
+                    if isinstance(ds, (int, float)):
+                        for prime in PRIMES:
+                            delta_space_values[str(prime)].append(float(ds))
+                    elif isinstance(ds, dict):
+                        for k, v in ds.items():
+                            key = str(k)
+                            if key in delta_space_values and isinstance(v, (int, float)):
+                                delta_space_values[key].append(float(v))
             except Exception:
                 pass
+        delta_T_mean = {f"delta_T_mean_{p}": (sum(vals) / len(vals)) if vals else None for p, vals in delta_T_values.items()}
+        delta_T_min = {f"delta_T_min_{p}": (min(vals) if vals else None) for p, vals in delta_T_values.items()}
+        delta_T_max = {f"delta_T_max_{p}": (max(vals) if vals else None) for p, vals in delta_T_values.items()}
+        delta_space_mean = {f"delta_space_mean_{p}": (sum(vals) / len(vals)) if vals else None for p, vals in delta_space_values.items()}
+        delta_space_min = {f"delta_space_min_{p}": (min(vals) if vals else None) for p, vals in delta_space_values.items()}
+        delta_space_max = {f"delta_space_max_{p}": (max(vals) if vals else None) for p, vals in delta_space_values.items()}
         rows.append(
             {
                 "material": data.get("material"),
                 "seed": data.get("seed"),
                 "max_evals": data.get("max_evals"),
                 "total_loss": data.get("total_loss"),
-                "delta_T_mean": delta_T_mean,
-                "delta_T_min": delta_T_min,
-                "delta_T_max": delta_T_max,
+                **delta_T_mean,
+                **delta_T_min,
+                **delta_T_max,
+                **delta_space_mean,
+                **delta_space_min,
+                **delta_space_max,
                 "weights_w_e": data.get("weights", {}).get("w_e"),
                 "weights_w_q": data.get("weights", {}).get("w_q"),
                 "weights_w_r": data.get("weights", {}).get("w_r"),
@@ -121,6 +141,23 @@ def build_sim_digest(runs_dir: Path, digest_dir: Path) -> None:
         df.to_excel(digest_dir / "simulator_summary.xlsx", index=False)
     except Exception:
         pass
+    value_cols = [col for col in df.columns if col.startswith("delta_T_") or col.startswith("delta_space_")]
+    if value_cols:
+        material_summary = df.groupby("material")[value_cols].agg(["mean", "min", "max"])
+        material_summary.columns = [f"{col}_{stat}" for col, stat in material_summary.columns]
+        material_summary.reset_index(inplace=True)
+        material_summary.to_csv(digest_dir / "simulator_delta_by_material.csv", index=False)
+        config_meta_path = digest_dir / "config_fingerprint_summary.csv"
+        if config_meta_path.exists():
+            try:
+                meta_df = pd.read_csv(config_meta_path)[["material", "category"]].drop_duplicates()
+                df_with_cat = df.merge(meta_df, on="material", how="left")
+                category_summary = df_with_cat.groupby("category")[value_cols].agg(["mean", "min", "max"])
+                category_summary.columns = [f"{col}_{stat}" for col, stat in category_summary.columns]
+                category_summary.reset_index(inplace=True)
+                category_summary.to_csv(digest_dir / "simulator_delta_by_category.csv", index=False)
+            except Exception:
+                pass
 
 
 def copy_noise_digest(noise_csv: Path, digest_dir: Path) -> None:
@@ -238,11 +275,48 @@ def inject_xi_into_configs(
                 idx += 1
         return signs
 
+    def build_prime_vector(raw: object, fallback_scalar: float) -> dict:
+        base = {str(p): float(fallback_scalar) for p in PRIMES}
+        if isinstance(raw, (int, float)):
+            return {str(p): float(raw) for p in PRIMES}
+        if isinstance(raw, dict):
+            for k, v in raw.items():
+                key = str(k)
+                if key in base and isinstance(v, (int, float)):
+                    base[key] = float(v)
+        return base
+
+    def parse_delta_block(raw: object, subnets: List[str], fallback_scalar: float) -> dict:
+        shared_default = build_prime_vector(raw if isinstance(raw, (int, float)) else fallback_scalar, fallback_scalar)
+        result = {subnet: dict(shared_default) for subnet in subnets}
+        if isinstance(raw, dict):
+            has_subnet_keys = any(str(k) in raw for k in subnets)
+            if has_subnet_keys:
+                for subnet in subnets:
+                    if subnet in raw:
+                        result[subnet] = build_prime_vector(raw[subnet], fallback_scalar)
+                return result
+            shared_default = build_prime_vector(raw, fallback_scalar)
+            return {subnet: dict(shared_default) for subnet in subnets}
+        return result
+
+    def infer_lambda_band(subnet: str) -> float:
+        lower = subnet.lower()
+        if "pi" in lower:
+            return 0.8
+        if "sigma" in lower:
+            return 1.0
+        return 1.0
+
     for cfg_path in configs_dir.glob("material_config_*.json"):
         mat = cfg_path.stem.replace("material_config_", "")
         xi_entry = xi_map.get(mat)
         if xi_entry is None:
             continue
+        delta_T_entry = None
+        delta_space_entry = None
+        lambda_band_entry: dict = {}
+        lambda_geo_entry: dict = {}
         # Backward compatibility: allow xi_entry to be a scalar
         if isinstance(xi_entry, (int, float)):
             xi_value = float(xi_entry)
@@ -252,8 +326,10 @@ def inject_xi_into_configs(
             xi_value = xi_entry.get("xi")
             xi_exp = xi_entry.get("xi_exp", {})
             k_skin = float(xi_entry.get("k_skin", 0.0))
-            delta_T = xi_entry.get("delta_T", default_delta_T)
-            delta_space = xi_entry.get("delta_space", default_delta_space)
+            delta_T_entry = xi_entry.get("delta_T", None)
+            delta_space_entry = xi_entry.get("delta_space", None)
+            lambda_band_entry = xi_entry.get("lambda_band", {})
+            lambda_geo_entry = xi_entry.get("lambda_geo", {})
         else:
             continue
         if xi_value is None:
@@ -266,6 +342,24 @@ def inject_xi_into_configs(
         if not subnets:
             continue
         xi_sign = derive_signs([str(s) for s in subnets])
+        config_delta_T = parse_delta_block(data.get("delta_T"), subnets, default_delta_T)
+        config_delta_space = parse_delta_block(data.get("delta_space"), subnets, default_delta_space)
+        delta_T_map = parse_delta_block(delta_T_entry, subnets, default_delta_T) if delta_T_entry is not None else config_delta_T
+        delta_space_map = parse_delta_block(delta_space_entry, subnets, default_delta_space) if delta_space_entry is not None else config_delta_space
+        lambda_band_map = {subnet: infer_lambda_band(subnet) for subnet in subnets}
+        if isinstance(data.get("lambda_band"), dict):
+            for subnet, value in data["lambda_band"].items():
+                if subnet in lambda_band_map and isinstance(value, (int, float)):
+                    lambda_band_map[subnet] = float(value)
+        if isinstance(lambda_band_entry, dict):
+            for subnet, value in lambda_band_entry.items():
+                if subnet in lambda_band_map and isinstance(value, (int, float)):
+                    lambda_band_map[subnet] = float(value)
+        lambda_geo_map = build_prime_vector(lambda_geo_entry, 1.0)
+        if isinstance(data.get("lambda_geo"), dict):
+            for k, v in data["lambda_geo"].items():
+                if str(k) in lambda_geo_map and isinstance(v, (int, float)):
+                    lambda_geo_map[str(k)] = float(v)
         data["xi"] = float(xi_value)
         data["xi_sign"] = xi_sign
         if xi_exp:
@@ -274,14 +368,10 @@ def inject_xi_into_configs(
             data["k_skin"] = k_skin
         else:
             data["k_skin"] = data.get("k_skin", k_skin)
-        if "delta_T" not in data:
-            data["delta_T"] = delta_T
-        else:
-            data["delta_T"] = data.get("delta_T", delta_T)
-        if "delta_space" not in data:
-            data["delta_space"] = delta_space if isinstance(delta_space, (int, float)) else default_delta_space
-        else:
-            data["delta_space"] = data.get("delta_space", delta_space if isinstance(delta_space, (int, float)) else default_delta_space)
+        data["delta_T"] = delta_T_map
+        data["delta_space"] = delta_space_map
+        data["lambda_band"] = lambda_band_map
+        data["lambda_geo"] = lambda_geo_map
         cfg_path.write_text(json.dumps(data, indent=2))
 
 

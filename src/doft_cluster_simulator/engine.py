@@ -45,6 +45,10 @@ class SimulationEngine:
             xi_exp = self.config.xi_exp
             xi_sign = self.config.xi_sign.get(subnet_name, 0)
             k_skin = self.config.k_skin
+            base_delta_T = self.config.delta_T_for(subnet_name)
+            base_delta_space = self.config.delta_space_for(subnet_name)
+            lambda_band = self.config.lambda_band_for(subnet_name)
+            lambda_geo = self.config.lambda_geo_vector()
             optimizer = SubnetOptimizer(
                 simulator=self.simulator,
                 weights=self.weights,
@@ -57,8 +61,10 @@ class SimulationEngine:
                 xi_sign=xi_sign,
                 xi_exp=xi_exp,
                 k_skin=k_skin,
-                base_delta_T=self.config.delta_T,
-                base_delta_space=self.config.delta_space,
+                base_delta_T=base_delta_T,
+                base_delta_space=base_delta_space,
+                lambda_band=lambda_band,
+                lambda_geo=lambda_geo,
             )
             result = optimizer.optimise(target)
             subnet_results[subnet_name] = SubnetSimulation(

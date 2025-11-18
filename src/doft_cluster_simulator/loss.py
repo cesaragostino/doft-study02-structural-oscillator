@@ -46,8 +46,8 @@ def compute_subnet_loss(
     xi_sign: int = 0,
     xi_exp: Optional[dict] = None,
     k_skin: float = 0.0,
-    delta_T: float = 0.0,
-    delta_space: float = 0.0,
+    lambda_band: float = 1.0,
+    lambda_geo: Optional[dict] = None,
 ) -> LossBreakdown:
     """Compute the weighted loss for a subnet."""
 
@@ -82,12 +82,15 @@ def compute_subnet_loss(
         if xi_exp:
             exp_shift = sum(float(v) for v in xi_exp.values())
             residual_adjusted = residual_adjusted - (xi_sign or 0) * exp_shift
-        # Surface temperature gradient: apply the same direction on every subnet for now.
-        gradient_factor = 1.0
-        residual_adjusted = residual_adjusted - gradient_factor * delta_T
-        # Spatial expansion term mirrors delta_T: uniform factor for now.
-        space_factor = 1.0
-        residual_adjusted = residual_adjusted - space_factor * delta_space
+        lambda_geo_vec = {str(p): float(lambda_geo.get(str(p), 1.0)) for p in PRIMES} if lambda_geo else {str(p): 1.0 for p in PRIMES}
+        delta_T_vec = {str(k): float(v) for k, v in params.delta_T.items()} if params.delta_T else {}
+        delta_space_vec = {str(k): float(v) for k, v in params.delta_space.items()} if params.delta_space else {}
+        for prime in PRIMES:
+            key = str(prime)
+            beta = lambda_geo_vec.get(key, 1.0)
+            lambda_total = float(lambda_band or 1.0) * lambda_geo_vec.get(key, 1.0)
+            residual_adjusted = residual_adjusted - beta * delta_T_vec.get(key, 0.0)
+            residual_adjusted = residual_adjusted - lambda_total * delta_space_vec.get(key, 0.0)
         diff_r = residual_adjusted - target.residual_exp
         residual_loss = _loss_term(diff_r) * weights.w_r
 
