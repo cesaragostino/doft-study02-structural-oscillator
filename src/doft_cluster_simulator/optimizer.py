@@ -89,6 +89,7 @@ class SubnetOptimizer:
             xi_sign=self.xi_sign,
             xi_exp=self.xi_exp,
             k_skin=self.k_skin,
+            delta_T=params.delta_T,
         )
         return loss, simulation_result
 
@@ -99,7 +100,8 @@ class SubnetOptimizer:
         ratios = {key: self.rng.uniform(*self.bounds.ratios) for key in PRIME_KEYS}
         delta = {key: self.rng.uniform(*self.bounds.deltas) for key in DELTA_KEYS}
         layer_assignment = [self.rng.randint(1, L) for _ in PRIME_KEYS]
-        return SubnetParameters(L=L, f0=f0, ratios=ratios, delta=delta, layer_assignment=layer_assignment)
+        delta_T = 0.0
+        return SubnetParameters(L=L, f0=f0, ratios=ratios, delta=delta, layer_assignment=layer_assignment, delta_T=delta_T)
 
     def _perturb(self, params: SubnetParameters) -> SubnetParameters:
         candidate = params.copy()
@@ -109,6 +111,7 @@ class SubnetOptimizer:
             candidate.ratios[key] = self._clamp(candidate.ratios[key] + self.rng.gauss(0.0, 0.05), self.bounds.ratios)
         for key in DELTA_KEYS:
             candidate.delta[key] = self._clamp(candidate.delta[key] + self.rng.gauss(0.0, 0.02), self.bounds.deltas)
+        candidate.delta_T = candidate.delta_T + self.rng.gauss(0.0, 0.01)
         candidate.layer_assignment = [
             max(1, min(candidate.L, layer + self.rng.choice([-1, 0, 1]))) for layer in candidate.layer_assignment
         ]

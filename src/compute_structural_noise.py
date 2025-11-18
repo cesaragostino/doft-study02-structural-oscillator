@@ -322,6 +322,7 @@ def run(args: argparse.Namespace) -> None:
         col_name = f"xi_exp_{prime}"
         summary_df[col_name] = summary_df[f"exp_diff_mean_{prime}"] * k_exp[str(prime)]
     summary_df["k_skin"] = args.k_skin
+    summary_df["delta_T"] = args.default_delta_T
 
     # Serialization
     output_csv = Path(args.output_csv)
@@ -336,6 +337,7 @@ def run(args: argparse.Namespace) -> None:
                 "xi": row.predicted_noise,
                 "xi_exp": xi_exp,
                 "k_skin": args.k_skin,
+                "delta_T": args.default_delta_T,
             }
         out_json = Path(args.output_json)
         out_json.parent.mkdir(parents=True, exist_ok=True)
@@ -364,6 +366,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional CSV with precomputed M_struct (columns: name, M_struct)",
     )
     parser.add_argument("--k-skin", type=float, default=0.05, help="Skin coupling coefficient for structural noise term")
+    parser.add_argument(
+        "--default-delta-T",
+        type=float,
+        default=0.0,
+        help="Default surface temperature gradient per material (used when no calibration is available)",
+    )
     return parser
 
 

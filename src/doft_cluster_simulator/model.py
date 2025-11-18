@@ -75,3 +75,28 @@ class ClusterSimulator:
         log_prime = sum(e * math.log(p) for e, p in zip(e_list, PRIMES)) / max(sum(e_list) + 1e-6, 1e-6)
         return math.log(max(f0, 1e-6)) - log_prime - 0.05 * avg_delta + 0.01 * avg_e
 
+    # Expose optimizable parameters for downstream optimizers
+    def get_optimizable_parameters(self, params: SubnetParameters) -> Dict[str, float]:
+        return {
+            "f0": params.f0,
+            "r2": params.ratios.get("r2", 0.0),
+            "r3": params.ratios.get("r3", 0.0),
+            "r5": params.ratios.get("r5", 0.0),
+            "r7": params.ratios.get("r7", 0.0),
+            "d2": params.delta.get("d2", 0.0),
+            "d3": params.delta.get("d3", 0.0),
+            "d5": params.delta.get("d5", 0.0),
+            "d7": params.delta.get("d7", 0.0),
+            "delta_T": getattr(params, "delta_T", 0.0),
+        }
+
+    def set_optimizable_parameters(self, params: SubnetParameters, values: Dict[str, float]) -> None:
+        params.f0 = values.get("f0", params.f0)
+        for key in ("r2", "r3", "r5", "r7"):
+            if key in values:
+                params.ratios[key] = values[key]
+        for key in ("d2", "d3", "d5", "d7"):
+            if key in values:
+                params.delta[key] = values[key]
+        if "delta_T" in values:
+            params.delta_T = values["delta_T"]

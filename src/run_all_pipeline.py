@@ -186,7 +186,7 @@ def build_config_digest(configs_dir: Path, digest_dir: Path, materials_csv: Path
         pass
 
 
-def inject_xi_into_configs(configs_dir: Path, xi_map: Dict[str, float]) -> None:
+def inject_xi_into_configs(configs_dir: Path, xi_map: Dict[str, float], default_delta_T: float) -> None:
     """Add xi value/xi_exp/k_skin and xi_sign mapping to each material_config_*.json."""
     import json
 
@@ -228,6 +228,7 @@ def inject_xi_into_configs(configs_dir: Path, xi_map: Dict[str, float]) -> None:
             xi_value = xi_entry.get("xi")
             xi_exp = xi_entry.get("xi_exp", {})
             k_skin = float(xi_entry.get("k_skin", 0.0))
+            delta_T = xi_entry.get("delta_T", default_delta_T)
         else:
             continue
         if xi_value is None:
@@ -248,6 +249,10 @@ def inject_xi_into_configs(configs_dir: Path, xi_map: Dict[str, float]) -> None:
             data["k_skin"] = k_skin
         else:
             data["k_skin"] = data.get("k_skin", k_skin)
+        if "delta_T" not in data:
+            data["delta_T"] = delta_T
+        else:
+            data["delta_T"] = data.get("delta_T", delta_T)
         cfg_path.write_text(json.dumps(data, indent=2))
 
 
@@ -273,6 +278,12 @@ def main() -> None:
     parser.add_argument("--skip-simulator", action="store_true", help="Only generate configs and structural noise")
     parser.add_argument("--skip-noise", action="store_true", help="Skip structural noise computation")
     parser.add_argument("--k-skin", type=float, default=0.05, help="Skin coupling coefficient for structural noise term")
+    parser.add_argument(
+        "--default-delta-T",
+        type=float,
+        default=0.0,
+        help="Default surface temperature gradient per material (passed to structural noise calc)",
+    )
     args = parser.parse_args()
 
     output_root = args.output_root
@@ -345,6 +356,7 @@ def main() -> None:
             noise_cmd.append("--fit-by-category")
         if materials:
             noise_cmd += ["--materials", *materials]
+        noise_cmd += ["--default-delta-T", str(args.default_delta_T)]
         run_cmd(noise_cmd, cwd=Path("."))
         if noise_json.exists():
             import json as _json
@@ -353,7 +365,7 @@ def main() -> None:
 
     # Inject xi/xip signs into material configs
     if xi_map:
-        inject_xi_into_configs(configs_dir, xi_map)
+        inject_xi_into_configs(configs_dir, xi_map, args.default_delta_T)
 
     # 3) Run simulator per material
     if not args.skip_simulator:

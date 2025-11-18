@@ -124,6 +124,7 @@ class SubnetParameters:
     ratios: Dict[str, float] = field(default_factory=dict)
     delta: Dict[str, float] = field(default_factory=dict)
     layer_assignment: List[int] = field(default_factory=list)
+    delta_T: float = 0.0
 
     def copy(self) -> "SubnetParameters":
         return SubnetParameters(
@@ -132,6 +133,7 @@ class SubnetParameters:
             ratios=dict(self.ratios),
             delta=dict(self.delta),
             layer_assignment=list(self.layer_assignment),
+            delta_T=self.delta_T,
         )
 
 
@@ -146,6 +148,7 @@ class MaterialConfig:
     xi_exp: Dict[str, float] = field(default_factory=dict)
     xi_sign: Dict[str, int] = field(default_factory=dict)
     k_skin: float = 0.0
+    delta_T: float = 0.0
 
     @classmethod
     def from_file(cls, path: Path) -> "MaterialConfig":
@@ -178,7 +181,19 @@ class MaterialConfig:
         k_skin = 0.0
         if isinstance(data.get("k_skin"), (int, float)):
             k_skin = float(data["k_skin"])
-        return cls(material=material, subnets=subnets, anchors=anchors, xi=xi, xi_exp=xi_exp, xi_sign=xi_sign, k_skin=k_skin)
+        delta_T = 0.0
+        if isinstance(data.get("delta_T"), (int, float)):
+            delta_T = float(data["delta_T"])
+        return cls(
+            material=material,
+            subnets=subnets,
+            anchors=anchors,
+            xi=xi,
+            xi_exp=xi_exp,
+            xi_sign=xi_sign,
+            k_skin=k_skin,
+            delta_T=delta_T,
+        )
 
 
 @dataclass
