@@ -1,29 +1,55 @@
-graph TD
-    %% --- DEFINICIÓN DE ESTILOS ---
-    classDef energy fill:#f96,stroke:#333,stroke-width:2px;
-    classDef skin fill:#ffcccc,stroke:#f00,stroke-width:2px;
-    classDef coreSafe fill:#ccffcc,stroke:#0f0,stroke-width:2px;
-    classDef coreLocked fill:#ff9999,stroke:#f00,stroke-width:4px;
-    classDef layer fill:#fff,stroke:#333,stroke-dasharray: 5 5;
+### 3.2. Visualizing Vector Dissipation Topologies
 
-    %% --- BLOQUE BINARIO ---
-    subgraph "SC_BINARY (Ej. MgB2)"
-        B_Input(Tensión Estructural ξ) -->|Impacto Alto| B_Skin[Piel p=2<br/>Alta Disipación]
-        B_Skin -->|Decaimiento Rápido| B_Mid[Capas Medias p=3,5]
-        B_Mid -.->|Residuo Nulo| B_Core[Núcleo p=7<br/>ESTABLE / LIMPIO]
-    end
+To illustrate the difference between the two families, the following diagram maps the flow of **Structural Tension ($\xi$)** from the surface (Skin) to the center (Core).
 
-    %% --- BLOQUE BASE HIERRO ---
-    subgraph "SC_IRON-BASED (Ej. FeSe)"
-        I_Input(Tensión Estructural ξ) -->|Impacto Moderado| I_Skin[Piel p=2<br/>Baja Disipación]
-        I_Skin -->|Transmisión| I_Mid[Capas Medias p=3,5]
-        I_Mid ==>|Acoplamiento Fuerte| I_Core[Núcleo p=7<br/>ACOPLADO / ACTIVO]
-        I_Core -.->|Feedback de Ruido| I_Skin
-    end
+```text
+[ VECTOR DISSIPATION ARCHITECTURE ]
 
-    %% --- ASIGNACIÓN DE CLASES ---
-    class B_Input,I_Input energy;
-    class B_Skin skin;
-    class B_Core coreSafe;
-    class I_Core coreLocked;
-    class B_Mid,I_Mid layer;
+TYPE A: SURFACE DISSIPATION (Family: SC_Binary)
+Example Material: MgB2
+----------------------------------------------------------------
+( Input Tension ξ )
+       ||
+       ||  <-- High Impact
+       VV
++---------------------+
+|  SKIN LAYER (p=2)   |  >> HOT SPOT: δT ≈ 0.03 (Max Dissipation)
++---------------------+
+       |
+       |  <-- Rapid Decay
+       v
++---------------------+
+|  MID LAYERS (p=3,5) |
++---------------------+
+       .
+       .  <-- Null Residue
+       .
++---------------------+
+|  CORE LAYER (p=7)   |  >> STABLE (No structural noise)
++---------------------+
+Result: The core is protected. Tension is expelled at the surface.
+
+
+TYPE B: CORE COUPLING (Family: SC_IronBased)
+Example Material: FeSe
+----------------------------------------------------------------
+( Input Tension ξ )
+       |
+       |  <-- Moderate Impact
+       v
++---------------------+
+|  SKIN LAYER (p=2)   |  >> LOW GRADIENT (Minimal dissipation)
++---------------------+
+       |
+       |  <-- Transmission
+       v
++---------------------+
+|  MID LAYERS (p=3,5) |
++---------------------+
+       ||
+       || <-- Strong Coupling
+       VV
++---------------------+
+|  CORE LAYER (p=7)   |  >> LOCKED: Noise correlates with Core (R² ≈ 0.64)
++---------------------+
+Result: The core participates in the tension. The whole volume vibrates.
