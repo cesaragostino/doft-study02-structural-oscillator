@@ -630,6 +630,17 @@ def main() -> None:
         help="Relative noise level for perturbations (e.g., 0.05 = ±5%)",
     )
     parser.add_argument("--run-loo", action="store_true", help="Run leave-one-out validation across families")
+    parser.add_argument("--skip-participation", action="store_true", help="Skip integer participation/null-model analysis")
+    parser.add_argument("--participation-subset", nargs="*", help="Materials to use when calibrating f_base")
+    parser.add_argument("--participation-subset-category", nargs="*", help="Categories to use for f_base calibration")
+    parser.add_argument("--participation-permutations", type=int, default=400, help="Permutations for null models")
+    parser.add_argument("--participation-thresholds", nargs="*", help="Thresholds for |delta| fractions (e.g. 0.02 0.01)")
+    parser.add_argument("--participation-bin-width", type=float, default=0.01, help="Bin width for |delta| histogram")
+    parser.add_argument("--participation-max-delta", type=float, default=0.5, help="Max |delta| for histogram")
+    parser.add_argument("--participation-max-n", type=int, default=500, help="Max grid N when calibrating f_base")
+    parser.add_argument("--participation-grid-size", type=int, default=400, help="Grid size for f_base coarse search")
+    parser.add_argument("--participation-refine-steps", type=int, default=200, help="Refinement steps for f_base search")
+    parser.add_argument("--participation-f-base", type=float, help="Optional override for f_base (skip calibration)")
     args = parser.parse_args()
 
     output_root = args.output_root
@@ -776,6 +787,45 @@ def main() -> None:
         copy_noise_digest(noise_csv, digest_dir)
         build_family_correlation(noise_csv, sim_summary_path, digest_dir)
         build_pressure_digest(noise_json, sim_summary_path, digest_dir, pressure_lookup)
+
+    if not args.skip_participation:
+        participation_dir = digest_dir / "participation"
+        part_cmd = [
+            "python3",
+            "src/tools/integer_participation.py",
+            "--materials-csv",
+            str(args.materials_csv),
+            "--output-dir",
+            str(participation_dir),
+            "--bin-width",
+            str(args.participation_bin_width),
+            "--max-delta",
+            str(args.participation_max_delta),
+            "--permutations",
+            str(args.participation_permutations),
+            "--max-n",
+            str(args.participation_max_n),
+            "--grid-size",
+            str(args.participation_grid_size),
+            "--refine-steps",
+            str(args.participation_refine_steps),
+            "--seed",
+            str(args.seed),
+        ]
+        if args.participation_thresholds:
+            part_cmd += ["--thresholds", *args.participation_thresholds]
+        if args.participation_subset:
+            part_cmd += ["--subset", *args.participation_subset]
+        if args.participation_subset_category:
+            part_cmd += ["--subset-category", *args.participation_subset_category]
+        if args.participation_f_base is not None:
+            part_cmd += ["--f-base-override", str(args.participation_f_base)]
+        if materials:
+            part_cmd += ["--materials", *materials]
+        if noise_csv.exists():
+            part_cmd += ["--noise-csv", str(noise_csv)]
+        print("[INFO] Running integer participation + noise coupling analysis…")
+        run_cmd(part_cmd, cwd=Path("."))
 
     # Optional stability validations
     if args.run_sensitivity and not args.skip_noise:

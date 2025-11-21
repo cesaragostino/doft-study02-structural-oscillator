@@ -165,6 +165,12 @@ class MaterialConfig:
     material: str
     subnets: List[str]
     anchors: Dict[str, Dict[str, float]]
+    f_base: Optional[float] = None
+    N_i: Optional[float] = None
+    delta_i: Optional[float] = None
+    abs_delta_i: Optional[float] = None
+    nearest_magic_number: Optional[float] = None
+    nearest_magic_distance: Optional[float] = None
     xi: Optional[float] = None
     xi_exp: Dict[str, float] = field(default_factory=dict)
     xi_sign: Dict[str, int] = field(default_factory=dict)
@@ -225,6 +231,24 @@ class MaterialConfig:
             xi = float(xi_value)
         else:
             xi = None
+        f_base = data.get("f_base")
+        if not isinstance(f_base, (int, float)) or not math.isfinite(f_base):
+            f_base = None
+        N_i_val = data.get("N_i")
+        if not isinstance(N_i_val, (int, float)) or not math.isfinite(N_i_val):
+            N_i_val = None
+        delta_i_val = data.get("delta_i")
+        if not isinstance(delta_i_val, (int, float)) or not math.isfinite(delta_i_val):
+            delta_i_val = None
+        abs_delta_i_val = data.get("abs_delta_i")
+        if not isinstance(abs_delta_i_val, (int, float)) or not math.isfinite(abs_delta_i_val):
+            abs_delta_i_val = None
+        nearest_magic = data.get("nearest_magic_number")
+        if not isinstance(nearest_magic, (int, float)) or not math.isfinite(nearest_magic):
+            nearest_magic = None
+        nearest_magic_dist = data.get("nearest_magic_distance")
+        if not isinstance(nearest_magic_dist, (int, float)) or not math.isfinite(nearest_magic_dist):
+            nearest_magic_dist = None
         xi_exp = {}
         raw_xi_exp = data.get("xi_exp", {})
         if isinstance(raw_xi_exp, dict):
@@ -320,6 +344,12 @@ class MaterialConfig:
             material=material,
             subnets=subnets,
             anchors=anchors,
+            f_base=f_base,
+            N_i=N_i_val,
+            delta_i=delta_i_val,
+            abs_delta_i=abs_delta_i_val,
+            nearest_magic_number=nearest_magic,
+            nearest_magic_distance=nearest_magic_dist,
             xi=xi,
             xi_exp=xi_exp,
             xi_sign=xi_sign,

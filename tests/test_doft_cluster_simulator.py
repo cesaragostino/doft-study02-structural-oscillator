@@ -70,8 +70,8 @@ def test_residual_loss_uses_delta_T_and_xi_shift() -> None:
         ratios={"r2": 0.0, "r3": 0.0, "r5": 0.0, "r7": 0.0},
         delta={"d2": 0.0, "d3": 0.0, "d5": 0.0, "d7": 0.0},
         layer_assignment=[1, 1, 1, 1],
-        delta_T=0.1,
-        delta_space=0.2,
+        delta_T={"2": 0.1},
+        delta_space={"2": 0.2},
     )
     simulation = SimulationResult(
         e_sim=[0.0, 0.0, 0.0, 0.0],
@@ -96,15 +96,13 @@ def test_residual_loss_uses_delta_T_and_xi_shift() -> None:
         xi_sign=xi_sign,
         xi_exp=xi_exp,
         k_skin=k_skin,
-        delta_T=params.delta_T,
-        delta_space=params.delta_space,
     )
 
     expected_adjusted = simulation.residual_sim
     expected_adjusted -= xi_sign * xi_value
     expected_adjusted -= xi_sign * k_skin * xi_value
     expected_adjusted -= xi_sign * sum(xi_exp.values())
-    expected_adjusted -= params.delta_T  # gradient factor = 1
-    expected_adjusted -= params.delta_space  # space factor = 1
+    expected_adjusted -= params.delta_T["2"]  # gradient factor = 1
+    expected_adjusted -= params.delta_space["2"]  # space factor = 1
     expected_loss = (expected_adjusted - target.residual_exp) ** 2
     assert abs(breakdown.residual_loss - expected_loss) < 1e-12
