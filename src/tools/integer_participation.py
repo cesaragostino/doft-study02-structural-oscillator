@@ -189,10 +189,15 @@ def abs_delta_histogram(abs_delta: pd.Series, bin_width: float = 0.01, max_delta
 def abs_delta_histogram_by_category(participation_df: pd.DataFrame, bin_width: float, max_delta: float) -> pd.DataFrame:
     """Histogram of |delta| per category/family."""
 
-    if "category" not in participation_df.columns:
+    cat_col = None
+    for candidate in ("category", "category_x", "category_y"):
+        if candidate in participation_df.columns:
+            cat_col = candidate
+            break
+    if cat_col is None:
         return pd.DataFrame()
     rows = []
-    for category, group in participation_df.groupby(participation_df["category"].fillna("Unknown")):
+    for category, group in participation_df.groupby(participation_df[cat_col].fillna("Unknown")):
         hist = abs_delta_histogram(group["abs_delta"], bin_width=bin_width, max_delta=max_delta)
         for entry in hist.itertuples():
             rows.append(
@@ -282,11 +287,16 @@ def run_null_models(
 def summarize_thresholds_by_category(participation_df: pd.DataFrame, thresholds: Sequence[float]) -> pd.DataFrame:
     """Compute fraction of |delta| below thresholds per category/family."""
 
-    if "category" not in participation_df.columns:
+    cat_col = None
+    for candidate in ("category", "category_x", "category_y"):
+        if candidate in participation_df.columns:
+            cat_col = candidate
+            break
+    if cat_col is None:
         return pd.DataFrame()
     thresholds = list(thresholds)
     rows = []
-    for category, group in participation_df.groupby(participation_df["category"].fillna("Unknown")):
+    for category, group in participation_df.groupby(participation_df[cat_col].fillna("Unknown")):
         abs_delta = group["abs_delta"].to_numpy(dtype=float)
         abs_delta = abs_delta[np.isfinite(abs_delta)]
         if abs_delta.size == 0:
@@ -375,11 +385,23 @@ def correlate_with_noise_by_category(
 ) -> pd.DataFrame:
     """Correlate |delta| with noise metrics per category/family."""
 
-    if "category" not in participation_df.columns:
+    cat_col = None
+    for candidate in ("category", "category_x", "category_y"):
+        if candidate in participation_df.columns:
+            cat_col = candidate
+            break
+    if cat_col is None:
         return pd.DataFrame()
-    merged = participation_df.merge(noise_df, left_on="name", right_on="material", how="left")
+    merged = participation_df.merge(noise_df, left_on="name", right_on="material", how="left", suffixes=("_part", "_noise"))
+    merged_cat = None
+    for candidate in ("category_part", "category_x", "category"):
+        if candidate in merged.columns:
+            merged_cat = candidate
+            break
+    if merged_cat is None:
+        merged_cat = cat_col
     rows = []
-    for category, group in merged.groupby(merged["category"].fillna("Unknown")):
+    for category, group in merged.groupby(merged[merged_cat].fillna("Unknown")):
         for metric in metrics:
             if metric not in group.columns:
                 continue
