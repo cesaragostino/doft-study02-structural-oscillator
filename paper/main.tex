@@ -1,0 +1,689 @@
+\documentclass[%
+  aps,
+  prb,
+  reprint,
+  superscriptaddress,
+  longbibliography,
+  nofootinbib
+]{revtex4-2}
+
+% ---------- Packages ----------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{siunitx}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\graphicspath{{figures/}}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  citecolor=blue,
+  urlcolor=blue
+}
+
+% ---------- Macros ----------
+\newcommand{\Tc}{T_{\mathrm{c}}}
+\newcommand{\Tcone}{T_{\mathrm{c,\,ideal}}}
+\newcommand{\ThetaD}{\Theta_{\mathrm{D}}}
+\newcommand{\Fm}{F_{\mathrm{m}}}
+\newcommand{\Fmstar}{F_{\mathrm{m}}^{\ast}}
+\newcommand{\fbase}{f_{\mathrm{base}}}
+\newcommand{\fbasefam}[1]{f_{\mathrm{base},#1}}
+\newcommand{\Ncorr}{N_{\mathrm{corr}}}
+\newcommand{\Nraw}{N_{\mathrm{raw}}}
+\newcommand{\deltalock}{\delta}
+\newcommand{\znoise}{Z_{\xi}}
+\newcommand{\etal}{\textit{et al.}}
+\newcommand{\SG}{\mathcal{S}}
+
+\begin{document}
+
+% ---------- Title and Authors ----------
+\title{Integer participation, structural noise, and discrete base frequencies in superconducting and superfluid clusters}
+
+\author{C.~Agostino}
+\email{cesar.agostino@gmail.com}
+\affiliation{Independent researcher, Argentina}
+
+\date{\today}
+
+% ---------- Abstract ----------
+\begin{abstract}
+We revisit the ``mother frequency'' construction
+\(
+\Fm = \ThetaD / \Tc
+\)
+for a heterogeneous dataset of superconductors and superfluid ${}^4$He,
+and ask whether the resulting scale behaves as a genuine
+discrete oscillator count once structural noise is taken into account.
+We build a phenomenological noise model on the same dataset, using
+structural topology and pressure descriptors to estimate how much each
+observed critical temperature $\Tc$ deviates from an idealised,
+noise--free value.
+This yields an idealised transition temperature
+\(
+\Tcone_i = \Tc_i (1 + \widehat{\xi}_i)
+\)
+and a noise--corrected mother frequency
+\(
+\Fmstar_i = \ThetaD_i / \Tcone_i
+\),
+where $\widehat{\xi}_i$ is the predicted structural noise for material $i$.
+For each family $k$ we calibrate a base frequency
+$\fbasefam{k}$ that minimizes a robust loss between the
+integer participation
+\(
+\Ncorr_i = \Fmstar_i / \fbasefam{k}
+\)
+and the nearest integer.
+We then compare the distribution of distances
+\(
+|\deltalock_i| = |\Ncorr_i - \mathrm{round}(\Ncorr_i)|
+\)
+with null ensembles obtained by shuffling $\ThetaD$ or sampling from
+continuous surrogate distributions.
+
+Across all families, the real data show a strong excess of
+near-integer participation relative to nulls:
+Kolmogorov--Smirnov and Mann--Whitney tests yield
+$p \simeq 4\times 10^{-13}$,
+and Cliff's $\Delta \simeq 0.32$ indicates a medium effect size.
+At the family level, the median locking error $|\deltalock|$ varies
+systematically:
+molecular and oxide superconductors show tight integer locking,
+while high-pressure, binary and superfluid systems populate
+higher, noisier harmonics.
+Superfluid ${}^4$He calibrates to
+$\fbasefam{\mathrm{He}} \simeq 4.0$,
+and the global median of $\fbasefam{k}$ across all families is
+$\tilde{f}_{\mathrm{base}} \simeq 4.16$,
+suggesting an approximate 1--2--4 ladder of preferred scales.
+Materials with the best integer locking reside in systematically
+quieter regions of the structural noise landscape
+(Cliff's $\Delta \simeq -0.47$ between the
+top 20\% most integer-like and the rest),
+and the absolute locking error $|\deltalock|$ grows with the
+family--normalized noise $Z_{\xi}$.
+Overall, the results support a coarse picture in which
+a small number of discrete base frequencies, modulated by
+structural noise, organize both superconducting and superfluid
+transition scales into an integer participation pattern.
+We stress that this structure is phenomenological and approximate:
+whether it reflects a deeper oscillator-based mechanism or
+hidden regularities in curated experimental data remains
+an open question.
+\end{abstract}
+
+\maketitle
+
+% ---------- 1. Introduction ----------
+\section{Introduction}
+\label{sec:intro}
+
+Conventional descriptions of superconductivity and superfluidity
+relate the critical temperature $\Tc$ and characteristic excitation
+energies to microscopic parameters such as electron--phonon coupling,
+density of states, and pairing interactions
+\cite{BCS1957,Tinkham1996}.
+In previous DOFT-inspired work we explored a complementary,
+highly compressed view, in which transition scales are organised
+by a ``mother frequency''
+\(
+\Fm = \ThetaD / \Tc
+\)
+and a discrete locking grammar reminiscent of delayed oscillator
+networks with memory kernels \cite{Mori1965,Zwanzig2001}.
+The surprising outcome was that a heterogeneous set of superconductors
+and superfluid helium could be mapped into robust
+``prime-space fingerprints'',
+with relatively small residuals after a simple two-parameter correction.
+
+That earlier analysis treated structural noise implicitly, through
+a coarse correction law.
+Here we make the noise layer explicit and ask a sharper question:
+does the mother frequency behave as an integer participation count
+once we correct for a phenomenological estimate of structural
+and pressure-induced distortions?
+To address this we build, on the same dataset,
+a regression model that predicts how much each observed $\Tc$
+deviates from an idealised, noise-free value based on simple
+structural and pressure descriptors.
+We then treat that model as a phenomenological layer and study
+the integer structure of the resulting noise-corrected mother
+frequencies.
+
+The perspective adopted here is deliberately modest.
+We do not attempt to derive $\Fm$ or its discreteness from a microscopic
+Hamiltonian.
+Instead, we ask whether a simple integer–participation picture
+has empirical support once the main sources of noise are factored out,
+and whether the resulting patterns correlate with independently estimated
+structural noise.
+The outcome will be interpreted in the general spirit of
+mode–locking phenomena in driven oscillator systems
+\cite{Pikovsky2001,GuckenheimerHolmes1983}:
+integer and rational ratios as empirically favoured organising
+scales, not as exact microscopic invariants.
+
+% ---------- 2. Data and noise model ----------
+\section{Data and structural noise}
+\label{sec:data}
+
+\subsection{Materials and families}
+
+We work with an updated version of the curated dataset introduced
+in the previous DOFT-inspired study.
+Each row corresponds to a material and sub--network, labelled by a
+name and a category:
+SC\_TypeI, SC\_TypeII, SC\_Binary, SC\_Oxide, SC\_Molecular,
+SC\_HighPressure, SC\_IronBased, SC\_HeavyFermion,
+and a superfluid category for liquid ${}^4$He.
+For each entry we record the critical temperature $\Tc$,
+Debye temperature $\ThetaD$, Fermi energy $E_{\mathrm{F}}$ where available,
+and qualitative structural information (dimensionality, layering,
+coordination, pressure range, etc.).
+This structural information feeds into the noise model
+described below.
+
+\subsection{Components of structural noise}
+
+The DOFT-inspired viewpoint suggests that three ingredients dominate
+the deviation between the observed critical temperature and a
+hypothetical ``clean'' value:
+
+\begin{enumerate}
+  \item \emph{Thermal coupling noise} associated with the jump from
+    gap to Debye scales, which can smear the effective location of
+    the transition relative to a sharp oscillator threshold.
+  \item \emph{Structural noise} associated with cluster topology,
+    inhomogeneity, and defects, which broadens and distorts the
+    effective coupling landscape.
+  \item \emph{Pressure noise} associated with large changes in
+    external pressure along an otherwise similar structural path,
+    particularly in high-pressure hydrides and related systems.
+\end{enumerate}
+
+In practice these contributions are difficult to separate cleanly
+from published data.
+We therefore collapse them into a single effective noise amplitude
+$\widehat{\xi}_i$ for each material $i$, to be used as a
+phenomenological correction factor.
+
+\subsection{Phenomenological noise model}
+
+For each material we build a vector of descriptors
+$x_i$ encoding:
+
+\begin{itemize}
+  \item categorical family labels (Type I/II, binary, oxide, molecular,
+        high-pressure, iron-based, heavy-fermion, superfluid);
+  \item coarse structural features (layered vs three-dimensional,
+        presence of light atoms, multi-band character);
+  \item pressure information (ambient, moderate, extreme pressure,
+        approximate pressure range where available);
+  \item simple scale ratios such as $\ThetaD/\Tc$ and
+        gap-to-Debye ratios from the previous analysis.
+\end{itemize}
+
+We then fit a regression model of the form
+\begin{equation}
+  \widehat{\xi}_i = f_{\theta}(x_i),
+\end{equation}
+where $f_{\theta}$ is a regularised nonlinear regressor
+(gradient-boosted trees in the implementation used here),
+trained to minimise the mean absolute deviation between the
+observed $\Tc_i$ and a leave-one-out estimate of a local
+family baseline.
+Hyperparameters are selected by cross-validation within the
+dataset, and performance is summarised by standard metrics
+(mean absolute error, $R^2$) as well as diagnostic plots
+provided in the Supplementary Material.
+
+The resulting $\widehat{\xi}_i$ should not be interpreted as a
+microscopically precise decomposition of thermal, structural,
+and pressure effects.
+It is a coarse indicator of how much the observed $\Tc_i$
+deviates from an idealised value given the structural context
+of each material.
+We use it as a phenomenological knob to define a noise-corrected
+mother frequency.
+
+\subsection{Idealized $\Tc$ and mother frequency}
+\label{subsec:idealTc}
+
+Given $\widehat{\xi}_i$ we define an ``idealised'' critical temperature
+that would be observed in the absence of the inferred structural noise,
+\begin{equation}
+  \Tcone_i = \Tc_i \bigl( 1 + \widehat{\xi}_i \bigr),
+\end{equation}
+and a corresponding noise--corrected mother frequency
+\begin{equation}
+  \Fmstar_i = \frac{\ThetaD_i}{\Tcone_i}.
+\end{equation}
+For control we also retain the raw mother frequency
+\(
+\Fm_i = \ThetaD_i/\Tc_i
+\),
+and track both through the analysis.
+
+Because different families live in very different structural regimes,
+the raw noise $\widehat{\xi}_i$ is not directly comparable between,
+say, high--pressure hydrides and low--temperature Type--I metals.
+To compare noise across the entire dataset we therefore
+define a family--normalized $Z$--score,
+\begin{equation}
+  \znoise_i =
+    \frac{\widehat{\xi}_i - \mu_{\xi,k}}{\sigma_{\xi,k}},
+\end{equation}
+where $\mu_{\xi,k}$ and $\sigma_{\xi,k}$ are the mean and
+standard deviation of the predicted noise within family $k$.
+This rescaling allows us to ask whether materials that sit closer
+to integer participation counts tend to live in systematically
+quieter structural environments.
+
+% ---------- 3. Integer participation model ----------
+\section{Integer participation model}
+\label{sec:model}
+
+\subsection{Base frequency calibration}
+
+For each family $k$ we seek a base frequency $\fbasefam{k}$
+such that the corrected mother frequencies $\Fmstar_i$
+in that family are well described by integer multiples,
+\begin{equation}
+  \Ncorr_i = \frac{\Fmstar_i}{\fbasefam{k(i)}},
+\end{equation}
+with $k(i)$ denoting the family of material $i$.
+We define the locking error for each material as the distance to
+the nearest integer,
+\begin{equation}
+  \deltalock_i =
+  \bigl| \Ncorr_i - \mathrm{round}(\Ncorr_i) \bigr|.
+\end{equation}
+
+To calibrate $\fbasefam{k}$ we minimize a robust loss over
+materials $i$ in family $k$,
+\begin{equation}
+  \mathcal{L}_k(\fbasefam{k}) =
+  \mathrm{median}_i \, |\deltalock_i|
+  + \lambda \, \mathrm{mean}_i \, \Ncorr_i,
+\end{equation}
+where the small regularisation term $\lambda$ prevents the optimum
+from drifting to very high harmonics with artificially small residuals.
+We constrain the search to a physically reasonable range
+\(
+0.5 \le \fbasefam{k} \le 5.0
+\),
+so that the resulting participation counts $\Ncorr$ occupy a
+moderate range (typically $1 \lesssim \Ncorr \lesssim 40$)
+and can be meaningfully compared across families.
+
+We also explore a global--frequency variant in which a single
+$\fbase$ is used for all families.
+The qualitative conclusions are similar; here we focus on the
+family--wise calibration, which makes the contrast between families
+more transparent.
+
+\subsection{Null models and statistical tests}
+
+To test whether the observed locking structure could arise by chance,
+we construct null ensembles that preserve only coarse aspects of the data.
+
+\emph{Shuffle null.}
+We randomly permute the Debye temperatures $\ThetaD_i$
+across materials, recompute
+\(
+\Fmstar_{\pi(i)} = \ThetaD_{\pi(i)} / \Tcone_i
+\)
+with the same noise model, recalibrate $\fbasefam{k}$,
+and recompute the locking errors $|\deltalock_i|$.
+This preserves the distribution of $\Tc$, $\ThetaD$ and noise
+within each family but destroys any specific pairing between them.
+
+\emph{Continuous null.}
+As a more aggressive null we fit a simple continuous distribution
+(gamma or lognormal) to the corrected mother frequencies $\Fmstar_i$
+in each family, sample synthetic values from that distribution,
+and repeat the calibration and locking procedure.
+This removes even the discrete structure of the empirical $\Fmstar_i$.
+
+For both nulls we generate many realisations and compare the
+distribution of locking errors $|\deltalock_i|$ with the real data,
+using Kolmogorov--Smirnov and Mann--Whitney tests, and
+Cliff's $\Delta$ as a measure of effect size.
+Uncertainties and confidence intervals are estimated by nonparametric
+bootstrap resampling \cite{Efron1993}, and effect sizes are reported
+using Cliff’s dominance statistic $\Delta$ \cite{Cliff1993}, which is
+robust to non–Gaussian tails and directly interpretable as the
+probability that a randomly chosen sample from one group exceeds a
+randomly chosen sample from the other.
+
+% ---------- 4. Results ----------
+\section{Results}
+\label{sec:results}
+
+\subsection{Integer participation vs null ensembles}
+
+Figure~\ref{fig:N_hist} compares the distribution of
+integer participation counts $\Ncorr$ between the real data and
+the shuffle null.
+Both show a broad range of participation, from $\sim 1$ up to
+$\sim 40$, with clusters around low integers and around
+$\Ncorr \simeq 24$.
+The latter corresponds to families whose base frequency sits closer
+to $\sim 1$ rather than $\sim 4$.
+
+Figure~\ref{fig:delta_hist} focuses on the locking error
+$|\deltalock|$.
+On a log--scaled density axis, the real data exhibit a clear
+excess of near--integer events compared to the shuffled null.
+Kolmogorov--Smirnov and Mann--Whitney tests yield
+$p \simeq 3.7\times 10^{-13}$ and
+$p \simeq 2.7\times 10^{-13}$ respectively, and
+Cliff's $\Delta \simeq 0.32$ indicates a medium effect size.
+In other words, the dataset contains substantially more
+near--integer mother frequencies (after noise correction)
+than would be expected from a generic reshuffling of
+Debye and critical temperatures.
+
+% --- Figure 1: N histograms ---
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{fig01a_hist_N_real_vs_shuffle.png}
+  \caption{%
+    Distribution of integer participation counts
+    $\Ncorr = \Fmstar/\fbasefam{k}$ in the real data (blue)
+    compared with the shuffle null (orange).
+    Both exhibit broad support up to $\Ncorr\sim 40$,
+    with clusters near low integers and around $\Ncorr\simeq 24$,
+    corresponding to families whose base frequency lies
+    near unity.
+  }
+  \label{fig:N_hist}
+\end{figure}
+
+% --- Figure 2: delta histograms ---
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{fig01b_hist_delta_real_vs_shuffle.png}
+  \caption{%
+    Locking error $|\deltalock| =
+    |\Ncorr - \mathrm{round}(\Ncorr)|$
+    for the real data (blue) and shuffle null (orange),
+    on a log--density scale.
+    The real dataset shows a strong excess of near--integer
+    events relative to the null.
+    The overlaid annotation corresponds to
+    Kolmogorov--Smirnov and Mann--Whitney $p$--values and
+    Cliff's $\Delta$ between the two distributions.
+  }
+  \label{fig:delta_hist}
+\end{figure}
+
+\subsection{Per--family locking strength}
+
+Figure~\ref{fig:delta_by_family} summarises the locking error
+$|\deltalock|$ by family.
+To avoid a few extreme outliers we clip
+$|\deltalock|$ at unity.
+The median error (orange line in each box) varies systematically
+between families:
+molecular and oxide superconductors show the smallest typical
+errors, followed by iron--based and heavy fermion systems;
+Type--I, Type--II, binary, high--pressure and superfluid families
+show broader, higher--median distributions, consistent with
+stronger distortions of the underlying oscillator network.
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=\textwidth]{fig02_delta_by_family.png}
+  \caption{%
+    Per--family distribution of locking errors
+    $|\deltalock|$, clipped at $1.0$ for visual clarity.
+    Boxes show interquartile ranges, whiskers extend to
+    $1.5$ times the interquartile range, and outliers are
+    plotted individually.
+    Families are ordered by increasing median error.
+    Molecular and oxide superconductors show the tightest
+    integer participation, while high--pressure, binary and
+    superfluid systems populate broader, noisier harmonics.
+  }
+  \label{fig:delta_by_family}
+\end{figure*}
+
+\subsection{Base frequencies across families}
+
+The calibrated base frequencies $\fbasefam{k}$ are shown in
+Figure~\ref{fig:fbase_by_family}, ordered by their median values.
+Superfluid helium sits at
+$\fbasefam{\mathrm{He}} \simeq 4.0$,
+while the global median across families is
+$\tilde{f}_{\mathrm{base}} \simeq 4.16$
+(dashed line).
+Binary, molecular, high--pressure and Type--I superconductors
+cluster around this ``four--like'' scale.
+Oxides and heavy fermions sit near $\sim 2.3$,
+suggestive of an approximate half--harmonic of the same ladder,
+and iron--based systems calibrate near unity,
+corresponding to participation counts $\Ncorr$ clustered around
+$\sim 24$ rather than $\sim 6$.
+
+We do not interpret these values as exact rational ratios.
+Instead, we view them as approximate attractors within the allowed
+search range, consistent with a coarse 1--2--4 structure in the
+effective base frequencies.
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=\textwidth]{fig04a_fbase_by_family.png}
+  \caption{%
+    Calibrated base frequencies $\fbasefam{k}$
+    (medians per family) ordered from left to right.
+    The dashed line marks the global median
+    $\tilde{f}_{\mathrm{base}} \simeq 4.16$.
+    Superfluid helium calibrates near
+    $\fbasefam{\mathrm{He}} \simeq 4.0$;
+    several superconducting families cluster around the same
+    scale, while oxides and heavy fermions sit near $\sim 2.3$
+    and iron--based materials near unity.
+    These bands are consistent with an approximate 1--2--4
+    ladder of preferred base frequencies, though the structure
+    is phenomenological and not exact.
+  }
+  \label{fig:fbase_by_family}
+\end{figure*}
+
+\subsection{Locking vs structural noise}
+
+We now relate the locking error $|\deltalock|$ to the
+family--normalized noise $\znoise$ defined in
+Sec.~\ref{subsec:idealTc}.
+Figure~\ref{fig:delta_vs_noise} shows
+$|\deltalock|$ vs.\ $\znoise$ for the per--family medians,
+with colour coding by family.
+There is a positive Spearman rank correlation
+$\rho \simeq 0.34$ (annotated in the plot),
+indicating that families with higher normalized noise tend to
+show weaker integer locking.
+
+To probe this more directly we split the dataset into a
+``near--integer'' group (materials in the lowest 20\% of
+$|\deltalock|$) and the rest, and compare their noise
+distributions.
+Figure~\ref{fig:noise_groups} shows that the near--integer
+group is systematically quieter:
+Cliff's $\Delta \simeq -0.47$ indicates that a randomly chosen
+near--integer material is substantially more likely to have
+lower noise than a randomly chosen member of the rest group.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{fig03a_delta_vs_noise_scatter.png}
+  \caption{%
+    Locking error $|\deltalock|$ vs.\ family--normalized
+    structural noise $\znoise$, with points coloured by
+    superconducting family.
+    The annotation reports the Spearman rank correlation
+    between the two quantities.
+    Families with larger normalized noise tend to exhibit
+    weaker integer participation.
+  }
+  \label{fig:delta_vs_noise}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{fig03b_noise_almost_integer_vs_rest.png}
+  \caption{%
+    Structural noise $\znoise$ for two groups:
+    materials in the lowest 20\% of locking error
+    (``almost integer'') and the rest of the dataset.
+    The almost--integer group resides in systematically
+    quieter structural environments;
+    Cliff's $\Delta \simeq -0.47$ quantifies the effect size.
+  }
+  \label{fig:noise_groups}
+\end{figure}
+
+% ---------- 5. Discussion ----------
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{A phenomenological 1--2--4 ladder}
+
+The most striking numerical feature of this analysis is the emergence
+of a small set of preferred base frequencies.
+Superfluid ${}^4$He calibrates very close to
+$\fbasefam{\mathrm{He}} \simeq 4.0$,
+and the global median across superconducting families is
+$\tilde{f}_{\mathrm{base}} \simeq 4.16$.
+Several families---binary, Type--I, molecular and high--pressure
+superconductors---cluster around this scale,
+while oxides and heavy fermions sit near $\sim 2.3$, and
+iron--based superconductors near unity
+(Fig.~\ref{fig:fbase_by_family}).
+
+The appearance of approximate 1--2--4 bands in the calibrated base
+frequencies is reminiscent of mode--locking ladders in driven and
+coupled oscillator systems, where rational ratios between effective
+frequencies organise the dynamics into so--called Arnold tongues
+\cite{Pikovsky2001,GuckenheimerHolmes1983}.
+Our construction is much more phenomenological:
+we do not derive the locking ratios from a specific microscopic
+Hamiltonian, and the integer participation counts $\Ncorr$ are
+defined only at a coarse, family--dependent level.
+Nevertheless, the fact that a single noise--corrected mother
+frequency can be compressed into a small set of near--integer bands
+across superconductors and superfluid helium suggests that a similar
+mode--locking intuition may be a useful organising metaphor.
+
+We do not interpret the 1--2--4 structure as a derived microscopic
+constant.
+The bands are broad, the ratios are only approximate, and the
+calibration procedure itself may bias the optimum towards moderate
+values of $\fbase$.
+From a conservative standpoint, the main statement is simply that a
+small number of effective scales seem sufficient to organise the
+transition temperatures of a heterogeneous dataset once structural
+noise is accounted for.
+
+\subsection{Role of structural noise}
+
+The correlations between integer locking and structural noise
+(Figs.~\ref{fig:delta_vs_noise} and \ref{fig:noise_groups})
+support a simple physical narrative.
+In this view, the mother frequency $\Fm$ measures the participation
+of a coarse oscillator network in the transition,
+but the ability to resolve that participation as an integer
+depends on the structural environment.
+In quiet, well--ordered systems (small $\znoise$),
+integer multiples of a base frequency can be resolved clearly,
+leading to small $|\deltalock|$.
+In noisy, strongly distorted environments, the same underlying
+oscillator structure may be present but is blurred:
+participation counts are still discrete in principle, but
+experimentally appear as smeared non--integers.
+
+This narrative is consistent with the observed trends:
+families with strong structural distortions (high pressure,
+complex multiphase structures) show broader locking errors,
+while simpler molecular and oxide systems show tighter locking.
+It also explains why superfluid helium, despite its strong
+quantum coherence, sits in a relatively noisy band:
+the extracted structural noise includes the effect of large
+pressure ranges and the sensitivity of the roton mode itself.
+
+\subsection{Limitations and outlook}
+
+Several limitations of the present work are worth emphasising.
+First, the noise model is purely phenomenological and built from
+a limited set of structural descriptors.
+A more microscopic treatment, e.g.\ combining \emph{ab initio}
+phonon calculations with realistic disorder, would be needed to
+anchor $\widehat{\xi}$ in specific mechanisms.
+Second, the integer participation picture has so far been tested
+only on a curated dataset; out--of--sample validation on new
+materials will be crucial.
+Third, we have not connected the base frequencies $\fbasefam{k}$
+to concrete microscopic quantities such as characteristic phonon
+branches or collective modes.
+Doing so would require a bridge between the coarse mother
+frequency picture and the detailed excitation spectra of each
+family.
+
+Despite these caveats, the combination of strong statistical
+departures from null ensembles, the systematic family structure
+of locking errors and base frequencies, and the correlation with
+structural noise suggests that the integer participation picture
+captures a nontrivial regularity of the superconducting and
+superfluid landscape.
+Whether this ultimately points to a deeper oscillator--based
+description, or simply exposes hidden regularities in curated
+data, is a question that future experiments and larger datasets
+will decide.
+
+% ---------- 6. Conclusions ----------
+\section{Conclusions}
+\label{sec:conclusions}
+
+We have shown that, after correcting for a phenomenological model
+of structural noise, the mother frequency
+\(
+\Fm = \ThetaD / \Tc
+\)
+behaves as an approximate integer participation count of
+family--dependent base frequencies in a heterogeneous set of
+superconductors and superfluid helium.
+The distribution of distances to the nearest integer is
+incompatible with simple shuffle and continuous null models,
+with $p$--values $\sim 10^{-13}$ and a medium effect size.
+Different families exhibit distinct locking strengths and base
+frequencies, with a suggestive 1--2--4 ladder connecting
+iron--based, oxide/heavy--fermion, and helium/binary/Type--I
+systems.
+Materials with the tightest integer locking occupy systematically
+quieter regions of structural noise.
+
+We emphasise that the construction is phenomenological and
+deliberately conservative in its claims.
+The results do not establish a new microscopic theory of
+superconductivity or superfluidity.
+They do, however, show that a simple integer--participation
+grammar, coupled to a structural noise model, can organise a
+broad class of transition temperatures into a small number of
+discrete scales.
+This suggests new ways of summarising and probing complex
+materials datasets, and motivates further work on the connection
+between discrete oscillator networks, structural noise, and
+emergent coherence in quantum matter.
+
+% ---------- Bibliography ----------
+\bibliographystyle{apsrev4-2}
+\bibliography{mainNotes}
+
+\end{document}

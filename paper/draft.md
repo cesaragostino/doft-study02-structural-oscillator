@@ -1,417 +1,559 @@
- # Integer participation, structural noise, and discrete topology in superconducting and superfluid clusters
+\documentclass[
+  aps,
+  prb,
+  twocolumn,
+  superscriptaddress,
+  floatfix,
+  10pt
+]{revtex4-2}
 
-## Abstract
+% ====== Paquetes básicos ======
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{siunitx}
+\sisetup{detect-all}
+\usepackage{graphicx}
+\graphicspath{{figures/}} % <-- busca figuras en paper/figures/
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
 
-We study how structural noise and topology shape the “Mother Frequency”  
-\(F_m = \Theta_D / T_c\) in a heterogeneous set of superconductors and superfluid helium.  
-Building on a previously proposed delayed-oscillator locking framework, we introduce an
-integer participation model in which each material contributes an effective number of
-coherent “jumps” \(N\) to a common oscillatory backbone. A robust base frequency
-\(f_{\text{base}}\) is calibrated per family by minimizing the median distance of  
-\(N = F_m^* / f_{\text{base}}\) to the nearest integer, where \(F_m^*\) is corrected for
-family-dependent structural noise estimated from an independent simulator.
-We then ask a purely empirical question: are the corrected participations significantly
-more integer and less noisy than expected from simple null models?
+% ====== Macros ======
+\newcommand{\Tc}{T_{\mathrm{c}}}
+\newcommand{\Thetad}{\Theta_{\mathrm{D}}}
+\newcommand{\Fm}{F_{\mathrm{m}}}
+\newcommand{\Fmstar}{F_{\mathrm{m}}^{\ast}}
+\newcommand{\Ncorr}{N_{\mathrm{corr}}}
+\newcommand{\Nraw}{N_{\mathrm{raw}}}
+\newcommand{\deltan}{\delta}
+\newcommand{\fbase}{f_{\mathrm{base}}}
+\newcommand{\kB}{k_{\mathrm{B}}}
 
-Across \(\sim 250\) superconducting and superfluid entries, the distribution of  
-\(|\delta| = |N - \text{round}(N)|\) is strongly shifted toward zero relative to a
-shuffle-based null model (Kolmogorov–Smirnov \(p \approx 4 \times 10^{-13}\),
-Mann–Whitney \(p \approx 3 \times 10^{-13}\), Cliff’s \(\Delta \approx 0.32\)).  
-Integer participation is not uniform: families such as
-iron-based, oxide, heavy-fermion and molecular superconductors show systematically
-smaller \(|\delta|\) than high-pressure phases and superfluid helium.  
-The calibrated base frequencies form a smooth trend across families, with iron-based compounds near
-\(f_{\text{base}} \sim 1\), oxide and heavy-fermion families near
-\(f_{\text{base}} \sim 2 - 2.5\), and classical type-I metals around
-\(f_{\text{base}} \sim 4.5 - 5\).
+% ====== Documento ======
+\begin{document}
 
-Structural noise matters. We quantify it via a per-family \(z\)-score
-\(Z_\xi\) of the predicted \(T_c\) perturbation, and find a positive rank correlation
-between noise and distance to integer locking
-(Spearman \(\rho \approx 0.34, p \approx 6 \times 10^{-4}\)).  
-When we divide the dataset into an “almost integer” subset (lowest 20% in \(|\delta|\) )
-and the rest, the almost-integer group shows substantially reduced structural noise
-(Cliff’s \(\Delta \approx -0.47\)). Taken together, these results suggest that
-integer participation in the corrected Mother Frequency is a genuine feature of the
-data, that it varies in a structured way across families, and that it is favored in
-low-noise structural environments.
+\title{Integer participation and structural noise in the mother frequency of superconducting clusters}
 
-We interpret this as a complementary layer to the prime-space fingerprints reported
-in earlier work: the discrete exponents on \(\{2,3,5,7\}\) organize how families
-occupy a lattice of rational scales, while integer participation organizes how
-strongly each material engages a common oscillatory backbone once structural noise
-is factored out. Whether this reflects a deeper delayed-oscillator mechanism or
-simply regularities in curated experimental data remains an open question.
+\author{Cesar Agostino}
+\affiliation{Independent researcher, Argentina}
 
----
+\date{\today}
 
-## 1. Introduction
+% ====== Abstract ======
+\begin{abstract}
+We study whether the ``mother frequency'' 
+\(\Fm = \Thetad / \Tc\)
+of superconductors and superfluid helium exhibits integer locking once structural noise is removed.
+Building on a previously proposed delayed-oscillator framework, we treat
+\(\Fm\) as the effective participation of a mesoscopic cluster in a discrete
+ladder of modes and ask whether the noise-corrected ratio can be written as
+\(\Fmstar \approx \fbase\, N\) with integer \(N\).
+Using a curated dataset of \(\Tc\), Debye temperature, and structural descriptors
+for nine families (Type-I, Type-II, binary, oxides, molecular, iron-based, heavy-fermion, high-pressure,
+and superfluid helium), we:
 
-Superconductors and superfluids appear diverse at the microscopic level, yet display
-surprisingly simple patterns when their macroscopic energy scales are expressed in
-terms of a “Mother Frequency”
-\(F_m = \Theta_D / T_c\),
+(i) learn a structural-noise model that predicts distortions of \(\Tc\) from
+crystal and pressure features;
 
-where \(\Theta_D\) is a Debye temperature (or analogous phononic scale) and \(T_c\)
-is the critical temperature. In previous work we showed that, after a universal
-two-parameter correction, different families of superconductors and superfluid helium
-cluster into robust prime-space fingerprints: products and ratios of small primes
-\(\{2,3,5,7\}\) with family-dependent exponents. That study was deliberately
-phenomenological: we did not attempt to derive those primes from a microscopic model,
-but treated them as a coarse-grained grammar inspired by delayed-oscillator networks.
+(ii) define an ``ideal'' transition temperature
+\(\Tc^{\mathrm{ideal}} = \Tc(1+\xi)\) and mother frequency
+\(\Fmstar = \Thetad / \Tc^{\mathrm{ideal}}\);
 
-One major gap remained. The prime-space analysis compressed ratios between energy
-scales, but did not address how strongly each material participates in an
-underlying oscillatory backbone, nor how structural disorder and pressure reshape
-that participation. Intuitively, a material whose Mother Frequency fits an integer
-number of “jumps” of a base oscillation should be more robust to noise than one that
-lands halfway between integers. Conversely, structural noise and pressure should
-tend to smear out commensurabilities unless some discrete topology pushes the system
-back toward low-order locks.
+(iii) calibrate a family-dependent base frequency \(f_{\mathrm{base},k}\)
+by minimizing the median distance of \(\Fmstar / f_{\mathrm{base},k}\) to the nearest integer.
 
-In this work we take a step toward quantifying that picture. We introduce an
-integer participation model for the Mother Frequency, in which each material is
-assigned a participation number
-\(N = F_m^* / f_{\text{base}}\),
-and we ask whether the corrected \(N\) are unusually close to integers compared to
-simple null models. Here \(F_m^*\) is a structurally corrected Mother Frequency,
-and \(f_{\text{base}}\) is a base frequency calibrated globally and per family by a
-robust criterion.
+Across the full dataset the corrected participation numbers
+\(\Ncorr = \Fmstar / \fbase\) show a strong excess of near-integer values
+relative to null models that shuffle \(\Thetad\) across materials.
+The distribution of fractional distances
+\(|\deltan| = |\Ncorr - \mathrm{round}(\Ncorr)|\) is significantly more
+concentrated near zero than in the shuffled ensemble, with
+Kolmogorov--Smirnov and Mann--Whitney tests giving
+\(p \sim 10^{-13}\) and a medium Cliff's \(\Delta \approx 0.32\).
+Families differ systematically in their preferred base frequency:
+iron-based superconductors cluster around \(f_{\mathrm{base},k} \approx 1\),
+while Type-I metals sit near \(f_{\mathrm{base},k} \approx 4.7\),
+with superfluid helium and high-pressure hydrides occupying intermediate
+harmonics.
 
-The key questions are:
+We also find that materials with the strongest integer participation
+(the lowest 20\,\% in \(|\deltan|\)) have substantially lower structural noise
+than the rest of the dataset, with a large negative Cliff's
+\(\Delta \approx -0.47\) in the noise \(z\)-score.
+Overall, these results support a phenomenological picture in which
+structural disorder acts as a vector of dissipation that pulls mother
+frequencies away from a small discrete set of participation numbers.
+Whether this reflects a deeper oscillator-based mechanism or simply exposes
+hidden regularities in curated superconducting data remains an open
+question.
+\end{abstract}
 
-- **Integer participation:** Are the corrected participations \(N\) significantly
-  closer to integers than expected from shuffled or continuous null models?
+\maketitle
 
-- **Family structure:** Does the strength of integer locking vary systematically
-  across superconducting families and superfluid helium?
+% ====== 1. Introduction ======
+\section{Introduction}
+\label{sec:intro}
 
-- **Structural noise:** Is strong integer locking associated with lower structural
-  noise in a quantitative way?
+The critical temperature \(\Tc\) of a superconductor is usually understood
+as the outcome of microscopic pairing mechanisms, phonon spectra, and
+electronic structure.\cite{BCS1957,Tinkham1996}
+In parallel, phenomenological approaches often exploit empirical
+scalings and coarse-grained ratios such as \(\Thetad/\Tc\) to compare
+materials across families.
+The present work revisits one such ratio, the
+``mother frequency'' \(\Fm = \Thetad/\Tc\), from the perspective of
+delayed-oscillator networks and structural noise.
 
-We will see that the answer is “yes” to all three, with moderate but consistent
-effect sizes.
+In a related study we showed that a simple locking grammar on the primes
+\(\{2,3,5,7\}\), applied to Debye, electronic and thermal scales, yields
+stable ``prime-space fingerprints'' for superconductors and superfluid
+helium under a universal two-parameter correction law.
+Here we ask a simpler but sharper question:
+after accounting for structural noise, does \(\Fm\) behave as the
+participation of a mesoscopic cluster in a discrete ladder of modes?
+Concretely, can we write
+\begin{equation}
+    \Fmstar \approx f_{\mathrm{base},k} N,
+\end{equation}
+with \(N \in \mathbb{Z}^{+}\) and a family-dependent base
+frequency \(f_{\mathrm{base},k}\)?
 
----
+The analysis proceeds in three steps.
+First, we build a structural-noise model that predicts deviations in
+\(\Tc\) from simple cluster descriptors and residual pressures.
+Second, we define a noise-corrected mother frequency
+\(\Fmstar = \Thetad / \Tc^{\mathrm{ideal}}\), where
+\(\Tc^{\mathrm{ideal}}\) is the transition temperature one would
+observe in the absence of structural distortions.
+Third, we calibrate a base frequency for each family by minimizing the
+median distance of \(\Fmstar/f_{\mathrm{base},k}\) to the nearest
+integer, and compare the resulting integer participation pattern to
+several null models.
 
-## 2. Data and structural noise
+Our main findings are:
 
-### 2.1 Materials and families
+\begin{enumerate}
+    \item The corrected participation numbers \(\Ncorr\) show a statistically
+    significant excess of near-integer values relative to shuffled null
+    ensembles, with medium effect sizes and \(p\)-values well below
+    \(10^{-10}\).
 
-We work with essentially the same curated dataset used in the prime-space study:
-about 250 entries covering elemental type-I and type-II superconductors, binary and
-molecular compounds, heavy-fermion and iron-based families, high-pressure
-superconductors, and superfluid \(^4\)He at several pressures. Each entry carries:
+    \item Different families occupy distinct base frequencies:
+    iron-based superconductors are compatible with \(f_{\mathrm{base},k} \sim 1\),
+    while Type-I metals prefer higher harmonics
+    \(f_{\mathrm{base},k} \sim 4\text{--}5\).
 
-- material name and family label (e.g. SC_Binary, SC_IronBased, Superfluid),
-- a sub-network label (single, sigma, pi, pressure-specific modes),
-- critical temperature \(T_c\),
-- a Debye-like scale \(\Theta_D\) derived from phonon or thermodynamic data.
+    \item The strongest integer lockers (lowest 20\,\% in \(|\deltan|\))
+    have substantially lower structural noise than the rest of the
+    dataset, suggesting that disorder acts as a vector of dissipation
+    that smears integer participation.
 
-These are the same fields used to define the Mother Frequency
-\(F_m = \Theta_D / T_c\)
-in the original analysis.
+\end{enumerate}
 
-### 2.2 Structural noise predictor
+We emphasize that the present construction is phenomenological.
+We do not attempt to derive \(\Fm\) from a microscopic theory of delayed
+oscillators, nor to identify \(\fbase\) with a specific collective mode.
+Instead, we treat integer participation as an \emph{a priori}
+hypothesis about how coherent clusters might arrange themselves in the
+presence of noise, and test that hypothesis against curated data and
+explicit null models.
 
-To account for structural and pressure-induced disorder we introduce a scalar
-structural noise parameter \(\xi\) per material, obtained from an independent
-pipeline that combines:
+% ====== 2. Data and structural noise ======
+\section{Data and structural-noise model}
+\label{sec:data}
 
-- local coordination features (e.g. effective valence, packing),
-- pressure tags and simulated pressure response,
-- topological descriptors of the superconducting “cluster” (coordination, branching).
+\subsection{Dataset and families}
 
-The details of this predictor are not crucial for what follows; we only require that:
+The starting point is the same curated dataset as in the previous
+study, updated to version~v7 and limited to entries with consistent
+\(\Tc\) and \(\Thetad\) values.
+Each row corresponds to a material--subnetwork pair and includes the
+following fields: material name, category
+(SC\_TypeI, SC\_TypeII, SC\_Binary, SC\_Oxide, SC\_Molecular,
+SC\_IronBased, SC\_HeavyFermion, SC\_HighPressure, Superfluid),
+subnetwork label (single, \(\sigma\), \(\pi\), etc.), transition
+temperature \(\Tc\) (in kelvin), Debye temperature \(\Thetad\),
+and a set of structural descriptors.
 
-- it is trained or tuned independently of the integer participation analysis,
-- it is evaluated uniformly across families,
-- and it admits per-family statistics (mean and standard deviation).
+These descriptors include coarse information about lattice packing,
+coordination, residual pressure, and qualitative flags for structural
+instabilities identified in the experimental literature.
+They play a dual role: they parameterize structural noise in the
+transition temperature, and provide a basis for the null models
+discussed below.
 
-For each family \(k\) we compute a standardized noise score
+\subsection{Mother frequency and raw participation}
 
-\[
-Z_{\xi,i} = \frac{\xi_i - \mu_{\xi,k}}{\sigma_{\xi,k}},
-\]
+For each entry we define the raw mother frequency
+\begin{equation}
+    \Fm = \frac{\Thetad}{\Tc}
+\end{equation}
+measured in natural units.
+If one postulates a family-dependent base frequency
+\(f_{\mathrm{base},k}\) for category \(k\), the simplest participation
+number is
+\begin{equation}
+    \Nraw = \frac{\Fm}{f_{\mathrm{base},k}}.
+\end{equation}
+In the absence of structural noise we would expect \(\Nraw\) to be
+close to an integer.
+In practice, experimental uncertainties, disorder, and systematic
+differences across families all contribute to spread \(\Nraw\) away
+from the nearest integer.
 
-where \(\mu_{\xi,k}\) and \(\sigma_{\xi,k}\) are the family mean and standard
-deviation. This allows us to compare the relative noise level of materials across
-families on a common scale.
+\subsection{Structural noise and ideal transition temperature}
 
-### 2.3 Noise-corrected Mother Frequency
+To disentangle structural effects from genuine integer locking we fit
+a structural-noise model for the transition temperature.
+For each material we write
+\begin{equation}
+    \Tc^{\mathrm{ideal}} = \Tc \,(1 + \xi),
+\end{equation}
+where \(\xi\) is a dimensionless noise term predicted from structural
+features.
+The model is fitted separately for each family using a robust
+regression that downweights outliers and captures broad trends in how
+crystal complexity, residual pressure, and known instabilities modify
+\(\Tc\).
 
-Using the structural noise predictor we define an ideal critical temperature
+Once the model is trained, we obtain a predicted noise
+\(\hat{\xi}\) for each material and define
+\begin{equation}
+    \Fmstar = \frac{\Thetad}{\Tc^{\mathrm{ideal}}}
+            = \frac{\Thetad}{\Tc (1+\hat{\xi})}.
+\end{equation}
+By construction, \(\Fmstar\) is the mother frequency one would obtain
+if the material could be adiabatically ``cleaned'' of structural
+distortions while keeping its underlying cluster topology fixed.
 
-\[
-T_{c,\text{ideal}} = T_c (1 + \xi),
-\]
+To compare noise levels across families we compute
+a standardized noise score
+\begin{equation}
+    z_{\xi} =
+    \frac{\hat{\xi} - \mu_{\xi,k}}{\sigma_{\xi,k}},
+\end{equation}
+where \(\mu_{\xi,k}\) and \(\sigma_{\xi,k}\) are the mean and standard
+deviation of \(\hat{\xi}\) within family \(k\).
+Negative values of \(z_{\xi}\) correspond to cleaner-than-average
+structures, positive values to more disordered ones.
 
-which corresponds to the value expected if structural noise were “neutralized”
-according to the model. The corrected Mother Frequency is then
+% ====== 3. Integer participation pipeline ======
+\section{Integer participation pipeline}
+\label{sec:methods}
 
-\[
-F_m^* = \frac{\Theta_D}{T_{c,\text{ideal}}}.
-\]
+\subsection{Base frequency calibration}
 
-For comparison we keep the raw Mother Frequency
-\(F_m = \Theta_D / T_c\), but all
-quantitative results below are based on \(F_m^*\).
-
----
-
-## 3. Integer participation model
-
-### 3.1 Base frequency calibration
-
-For each material we want to express the corrected Mother Frequency as an effective
-number of base “jumps”
-
-\[
-N_i = \frac{F_{m,i}^*}{f_{\text{base},k(i)}},
-\]
-
-where \(k(i)\) is the family of material \(i\) and \(f_{\text{base},k}\) is a
-family-dependent base frequency. In a truly locked system the \(N_i\) would be
+For each family \(k\) we seek a base frequency \(f_{\mathrm{base},k}\)
+such that
+\(\Ncorr = \Fmstar / f_{\mathrm{base},k}\) is as close as possible to
 integers.
+Instead of minimizing a mean squared error, which is sensitive to
+outliers, we minimize the median absolute distance to the nearest
+integer:
+\begin{equation}
+    \mathcal{L}(f) =
+    \mathrm{median}_i \left|
+        \frac{\Fmstar_i}{f} - \mathrm{round}\!\left(
+        \frac{\Fmstar_i}{f}
+    \right)\right|.
+\end{equation}
+The search is constrained to a physically motivated range
+\(0.5 \le f \le 5.0\) to avoid trivial high-harmonic solutions
+with extremely small base frequencies.
 
-We estimate \(f_{\text{base},k}\) by minimizing a robust loss:
+In addition, a small penalty proportional to the mean participation
+\(\langle \Ncorr \rangle\) is added to break degeneracies between
+integer-scaled solutions:
+\begin{equation}
+    \tilde{\mathcal{L}}(f) = \mathcal{L}(f) +
+    \lambda \,\langle \Ncorr \rangle,
+\end{equation}
+with \(\lambda \ll 1\).
+This mild regularization prefers lower harmonics (smaller \(N\)) when
+two choices of \(f\) yield similar integer alignment.
 
-\[
-L(f) = \text{median}_i\,|N_i - \text{round}(N_i)| + \lambda\,\text{mean}_i\,N_i,
-\]
+Figure~\ref{fig:fbase_by_family} summarizes the calibrated
+\(f_{\mathrm{base},k}\) values for all families.
+Iron-based superconductors cluster near \(\fbase \approx 1.1\),
+whereas Type-I metals sit near \(\fbase \approx 4.8\), with superfluid
+helium and high-pressure hydrides in between.
 
-with \(\lambda\) a small regularization constant that softly prefers solutions with
-smaller typical \(N\) when several harmonics tie. This avoids over-emphasizing rare
-outliers and disfavors trivial rescalings such as \(N \to 10N\).
+\subsection{Integer distance and almost-integer group}
 
-We explore two modes:
+Given the calibrated base frequencies, the corrected participation
+number for each material is
+\begin{equation}
+    \Ncorr = \frac{\Fmstar}{f_{\mathrm{base},k}}.
+\end{equation}
+We define the absolute distance to the nearest integer as
+\begin{equation}
+    |\deltan| =
+    \left| \Ncorr - \mathrm{round}(\Ncorr) \right|.
+\end{equation}
+Small values of \(|\deltan|\) indicate strong integer locking.
 
-- a global calibration with a single \(f_{\text{base}}\) shared by all families,
-- a per-family calibration with an independent \(f_{\text{base},k}\) for each
-  of the nine major families.
+To probe the relationship between structural noise and integer
+locking we define an ``almost-integer'' group consisting of the lowest
+20\,\% of the \(|\deltan|\) distribution and compare it to the rest of
+the dataset using Cliff's \(\Delta\) on the noise \(z\)-score
+\(z_{\xi}\).
 
-In addition we test two simple hypotheses for the target frequency:
+\subsection{Null models}
 
-- \(H_1: F_{\text{target}} = F_m^*\),
-- \(H_2: F_{\text{target}} = F_m^* / 2\),
+Two null models are used to assess the statistical significance of the
+observed integer participation:
 
-motivated by the possibility that the Mother Frequency may represent either the
-fundamental or a second harmonic of a more primitive oscillation. In practice the
-\(F_m^*\) hypothesis provides equal or lower loss in almost all cases, and we use
-it as default in the figures.
+\begin{enumerate}
+    \item \textbf{Shuffle null:} within each family, we randomly
+    permute \(\Thetad\) across materials while keeping \(\Tc\) and the
+    structural noise model fixed.
+    This preserves the marginal distributions of \(\Thetad\) and
+    \(\Tc\) but breaks any material-specific locking.
 
-For each material we record the participation number \(N_i\), the distance to the
-nearest integer
+    \item \textbf{Continuous null:} for the global \(\Fmstar\)
+    distribution we fit a smooth continuous distribution (Gamma or
+    lognormal) and draw synthetic \(\Fmstar\) values from the fitted
+    law, re-using the same \(f_{\mathrm{base},k}\).
+\end{enumerate}
 
-\[
-\delta_i = |N_i - \text{round}(N_i)|,
-\]
+For each null realization we recompute \(\Ncorr\) and \(|\deltan|\) and
+compare the resulting distributions to the real data using
+Kolmogorov--Smirnov (KS) and Mann--Whitney (MW) tests, together with
+Cliff's \(\Delta\).
 
-and several summary statistics described below.
+% ====== 4. Results ======
+\section{Results}
+\label{sec:results}
 
-### 3.2 Null models
+\subsection{Global integer participation}
 
-To assess whether the observed integer participation is non-trivial we build simple
-null models that preserve some aspects of the data but destroy any coherent locking
-between \(\Theta_D\) and \(T_c\).
+Figure~\ref{fig:hist_N_real_vs_shuffle} compares the distribution of
+corrected participation numbers \(\Ncorr = \Fmstar/f_{\mathrm{base},k}\)
+for the real data and the shuffle null ensemble.
+Both are broadly supported on \(N \sim 1\text{--}40\), but the real
+distribution shows enhanced weight near small integers
+\(N \sim 1\text{--}4\) and a pronounced spike around
+\(N \sim 24\text{--}25\), corresponding mainly to superfluid helium
+and selected high-pressure hydrides.
 
-Our main null model is a shuffle:
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{fig01a_hist_N_real_vs_shuffle}
+    \caption{%
+        Integer participation numbers \(\Ncorr = \Fmstar/f_{\mathrm{base},k}\)
+        for the real data (blue) and shuffle null model (orange).
+        The real distribution exhibits enhanced weight near small integers
+        and a distinct cluster around \(N \sim 24\text{--}25\) not reproduced
+        by the null ensemble.
+    }
+    \label{fig:hist_N_real_vs_shuffle}
+\end{figure}
 
-- \(\Theta_D\) values are randomly permuted within the dataset (or within families),
-- the structural noise correction and base-frequency calibration are repeated,
-- and the resulting distances \(|\delta|_{\text{null}}\) are recorded.
+A more direct view of integer participation is shown in
+Fig.~\ref{fig:hist_delta_real_vs_shuffle}, where we compare the
+distribution of \(|\deltan|\) for real and shuffled data.
+On a logarithmic density scale the real data are clearly more
+concentrated near \(|\deltan| = 0\).
+KS and MW tests yield \(p \approx 3.7 \times 10^{-13}\) and
+\(p \approx 2.7 \times 10^{-13}\), respectively, with a medium
+Cliff's \(\Delta \approx 0.32\).
+Thus the probability that the observed excess of near-integer
+participation arises from random reshuffling of Debye temperatures is
+astronomically small.
 
-Repeating this procedure many times yields an empirical null distribution for any
-statistic of interest (e.g. median \(|\delta|\)). In addition we experimented with
-gamma/log-normal fits to the continuous \(F_m^*\) distribution; these gave similar
-qualitative results, so we focus on the shuffle null in what follows.
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{fig01b_hist_delta_real_vs_shuffle}
+    \caption{%
+        Distribution of fractional distances to the nearest integer
+        \(|\deltan| = |\Ncorr - \mathrm{round}(\Ncorr)|\) for the real
+        data (blue) and shuffle null model (orange), plotted on a
+        logarithmic density scale.
+        The real distribution is significantly more concentrated near
+        zero, with KS and MW \(p\)-values \(\sim 10^{-13}\) and
+        Cliff's \(\Delta \approx 0.32\).
+    }
+    \label{fig:hist_delta_real_vs_shuffle}
+\end{figure}
 
-### 3.3 Statistical measures
+\subsection{Family-dependent locking strength}
 
-We use three complementary measures to quantify integer locking:
+Integer participation is not uniform across families.
+Figure~\ref{fig:delta_by_family} shows box plots of \(|\deltan|\)
+(clipped at 1.0 for readability) grouped by family and ordered by the
+median.
+Type-I and molecular superconductors exhibit the tightest locking,
+with medians \(\lesssim 0.1\), followed by iron-based and heavy-fermion
+materials.
+Superfluid helium and high-pressure hydrides show broader
+distributions, consistent with their more extreme structural and
+pressure environments.
 
-- **Distance to integer:** the distribution of \(|\delta|\) across all materials.
-- **Family-level medians:** the median \(|\delta|\) per family as a measure of
-  locking strength.
-- **Participation histograms:** the distribution of \(N_i\) itself.
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=\textwidth]{fig02_delta_by_family}
+    \caption{%
+        Per-family distribution of \(|\deltan|\), the absolute distance
+        to the nearest integer, clipped at 1.0 for visibility.
+        Families are ordered by median \(|\deltan|\).
+        Type-I and molecular superconductors show the tightest integer
+        locking, whereas high-pressure and superfluid families are more
+        broadly distributed.
+    }
+    \label{fig:delta_by_family}
+\end{figure*}
 
-Empirical vs null distributions are compared using:
+The corresponding base frequencies are summarized in
+Fig.~\ref{fig:fbase_by_family}.
+Families organize along a discrete ladder:
+iron-based superconductors near \(\fbase \approx 1.1\),
+Type-II, oxides and heavy fermions near \(\fbase \approx 2.3\text{--}2.5\),
+superfluid helium and binaries near \(\fbase \approx 4.0\text{--}4.1\),
+and Type-I metals near \(\fbase \approx 4.8\).
+The global median across families is \(\fbase \approx 4.16\),
+close to the value obtained in the original prime-space fingerprint
+study.
 
-- the Kolmogorov–Smirnov test,
-- the Mann–Whitney rank test,
-- Cliff’s \(\Delta\) effect size.
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=\textwidth]{fig04a_fbase_by_family}
+    \caption{%
+        Calibrated base frequency \(\fbase\) per family, shown as the
+        median of the best-fit values and ordered by that median.
+        Iron-based superconductors sit near \(\fbase \approx 1.1\),
+        whereas Type-I metals prefer higher harmonics around
+        \(\fbase \approx 4.8\).
+        The dashed line marks the global median
+        \(\fbase \approx 4.16\).
+    }
+    \label{fig:fbase_by_family}
+\end{figure*}
 
-We quantify the relationship between structural noise and integer locking via:
+\subsection{Structural noise vs integer locking}
 
-- Spearman rank correlation between \(|\delta_i|\) and \(Z_{\xi,i}\),
-- Cliff’s \(\Delta\) comparing noise between the “almost-integer” group
-  (lowest 20% in \(|\delta|\)) and the rest.
+To probe the link between structural noise and integer participation
+we compare \(|\deltan|\) to the standardized noise score \(z_{\xi}\).
+Figure~\ref{fig:delta_vs_noise_scatter} shows a scatter plot of
+\(|\deltan|\) vs.\ \(z_{\xi}\) for a representative subset of
+materials, color-coded by family.
+There is a clear trend: cleaner structures (negative \(z_{\xi}\))
+tend to have smaller \(|\deltan|\), whereas disordered ones cluster at
+higher \(|\deltan|\).
+The Spearman rank correlation is
+\(\rho \approx 0.34\) with \(p \approx 5.6 \times 10^{-4}\).
 
----
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{fig03a_delta_vs_noise_scatter}
+    \caption{%
+        Scatter plot of \(|\deltan|\) vs.\ structural-noise score
+        \(z_{\xi}\), color-coded by family.
+        Cleaner structures (negative \(z_{\xi}\)) tend to show stronger
+        integer locking (smaller \(|\deltan|\)).
+        The Spearman rank correlation is
+        \(\rho \approx 0.34\) with \(p \approx 5.6 \times 10^{-4}\).
+    }
+    \label{fig:delta_vs_noise_scatter}
+\end{figure}
 
-## 4. Results
+A more direct comparison is shown in
+Fig.~\ref{fig:noise_almost_integer_vs_rest}, where we contrast the
+noise distribution of the almost-integer group (lowest 20\,\% in
+\(|\deltan|\)) with that of the remaining materials.
+The almost-integer group is shifted to lower noise, with median
+\(z_{\xi} \approx -0.9\) compared to \(\approx 0.45\) for the rest,
+and a large negative Cliff's \(\Delta \approx -0.47\).
+This supports the interpretation of structural noise as a vector of
+dissipation that smears discrete participation.
 
-### 4.1 Global integer participation vs null models
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{fig03b_noise_almost_integer_vs_rest}
+    \caption{%
+        Structural-noise score \(z_{\xi}\) for the almost-integer group
+        (lowest 20\,\% in \(|\deltan|\)) and for the rest of the
+        dataset.
+        The almost-integer group is substantially cleaner, with a large
+        negative Cliff's \(\Delta \approx -0.47\).
+    }
+    \label{fig:noise_almost_integer_vs_rest}
+\end{figure}
 
-Figure 1a compares the distribution of corrected participations \(N_i\) with that
-obtained from shuffle-based null models. While both real and null distributions are
-broad, the empirical histogram shows pronounced accumulations near low integers
-(\(N \approx 1,2,3\)) and around a higher cluster (\(N \approx 24-25\)) that are
-much less visible in the shuffled data. This suggests that certain participation
-numbers are preferentially occupied once structural noise is taken into account.
+% ====== 5. Discussion and outlook ======
+\section{Discussion and outlook}
+\label{sec:discussion}
 
-Figure 1b focuses on the distance to integer \(|\delta|\), plotted on a log-density
-scale. The real data are consistently more concentrated near zero than the shuffled
-null: the tail of almost-integer cases is enhanced, and the shoulder at
-\(|\delta| \gtrsim 0.2\) is depleted. Formal tests confirm that this difference is
-highly significant:
+The analysis above shows that once structural noise is explicitly
+modeled and corrected, the mother frequency
+\(\Fm = \Thetad/\Tc\) of superconductors and superfluid helium
+exhibits a robust tendency to organize into near-integer
+participation numbers.
+This tendency is statistically significant relative to shuffle-based
+null models and varies systematically across families.
 
-- KS test \(p \approx 3.7 \times 10^{-13}\),
-- Mann–Whitney \(p \approx 2.7 \times 10^{-13}\),
-- Cliff’s \(\Delta \approx 0.32\) (moderate effect size).
+From a delayed-oscillator perspective, one can view the base
+frequencies \(f_{\mathrm{base},k}\) as effective resonant ladders for
+different cluster topologies, with structural noise acting as a vector
+of decoherence that pushes participation away from exact integers.
+Iron-based superconductors, with \(f_{\mathrm{base},k} \sim 1\), behave
+as if they were sitting close to a fundamental mode, whereas
+Type-I metals appear to operate on higher harmonics
+\(\sim 4\text{--}5\).
+Whether this reflects genuine differences in underlying mesoscopic
+oscillators, or simply tracks regularities in how lattice stiffness and
+electron--phonon coupling co-vary across families, remains to be seen.
 
-Thus, under very conservative null models that keep the one-point statistics of
-\(\Theta_D\) and \(T_c\) but scramble their pairing, the observed Mother Frequencies
-are too close to integer participation to be explained by chance alone.
+From a more conservative viewpoint, the results can be read as a
+coarse-grained statistical statement:
+after accounting for structural noise, the ratio \(\Thetad/\Tc\) is
+not randomly distributed but instead shows a distinct excess of
+near-integer values, with family-dependent base frequencies.
+This is already non-trivial, as the null models preserve the marginal
+distributions of \(\Thetad\) and \(\Tc\) and still fail to reproduce
+the observed locking.
 
-### 4.2 Family-dependent locking strength
+The present work should be viewed as a first delivery.
+We have provided an explicit pipeline, open data, and a set of
+sanity checks that can be refined or falsified as more materials and
+better structural descriptors become available.
+Several directions for future work are clear:
 
-Figure 2 summarizes the distribution of \(|\delta|\) per family as boxplots,
-clipped at \(|\delta| = 1\) for readability and ordered by the median.
+\begin{itemize}
+    \item Incorporating dynamical data (e.g.\ phonon linewidths,
+    pump--probe measurements) to test whether strongly locked materials
+    also show distinctive coherence times.
 
-Several patterns stand out:
+    \item Extending the analysis to unconventional superconductors not
+    covered in the present dataset and to other quantum fluids.
 
-- Oxide, iron-based and heavy-fermion families display the smallest medians
-  (strongest integer locking), with typical \(|\delta|\) of order \(0.05 - 0.1\).
-- Molecular superconductors also show relatively tight locking.
-- Type-I and type-II elemental and binary superconductors have broader distributions,
-  with medians around \(0.15 - 0.2\).
-- High-pressure phases and superfluid helium show both larger medians and broader
-  spreads, consistent with the intuition that these systems operate in more
-  strongly perturbed structural environments.
+    \item Connecting the phenomenological base frequencies
+    \(f_{\mathrm{base},k}\) to explicit models of delayed oscillators
+    with memory and dissipation.\cite{Mori1965,Zwanzig2001}
+\end{itemize}
 
-In other words, integer participation is not a homogeneous global phenomenon: some
-families sit close to the integer lattice, others hover at a moderate distance.
+Whether integer participation ultimately points to a deeper
+oscillator-based description or simply exposes hidden regularities in
+curated experimental data is a question that future observations will
+decide.
+For now, the main empirical statement is simple:
+once structural noise is cleaned away, superconducting clusters and
+superfluid helium prefer to lock their mother frequencies onto a
+discrete ladder of participation numbers rather than wandering freely
+in the continuum.
 
-### 4.3 Base frequency by family
+% ====== Acknowledgements ======
+\begin{acknowledgments}
+The author thanks the open-source and open-data communities for
+making this work possible, and acknowledges intensive use of modern
+language models for code refactoring, statistical sanity checks, and
+editing assistance.
+All modeling decisions, data curation and interpretations are the
+responsibility of the author.
+\end{acknowledgments}
 
-The calibrated base frequencies \(f_{\text{base},k}\) are shown in Figure 4. Each
-bar represents the family median, and the dashed line marks the global median,
-about \(f_{\text{base}} \approx 4.16\).
+% ====== Bibliography ======
+\bibliographystyle{apsrev4-2}
+\bibliography{mainNotes}
 
-- Iron-based superconductors sit near \(f_{\text{base}} \sim 1.1\),
-- heavy-fermion and oxide families cluster around \(2 - 2.5\),
-- molecular and high-pressure systems lie near \(4.5\),
-- type-I elemental superconductors reach \(f_{\text{base}} \sim 4.8\).
-
-The ordering of families by base frequency is smooth rather than random, and only
-weakly sensitive to technical choices (such as global vs per-family calibration and
-the \(F_m\) vs \(F_m/2\) hypothesis). This supports the view that different
-superconducting families occupy distinct “bands” of participation in the same
-corrected Mother Frequency.
-
-### 4.4 Structural noise vs integer locking
-
-Figure 3a plots \(|\delta|\) versus the structural noise \(Z_{\xi,i}\), with points
-colored by family. There is a clear trend: materials with higher structural noise
-tend to sit farther from integer participation. A Spearman rank correlation yields
-\(\rho \approx 0.34\) with \(p \approx 5.6 \times 10^{-4}\), indicating a moderate
-but statistically significant association across the heterogeneous dataset.
-
-To emphasize the effect size, we split the dataset into two groups:
-
-- **“almost integer”**: the 20% of materials with the smallest \(|\delta|\),
-- **“rest”**: the remaining 80%.
-
-Figure 3b compares the distributions of \(Z_\xi\) for these two groups. The
-almost-integer group exhibits systematically lower structural noise, with a strong
-Cliff’s effect size \(\Delta \approx -0.47\) (negative because noise is lower in
-the almost-integer set). In other words, materials whose corrected Mother Frequency
-participation is closest to an integer also tend to live in structurally quieter
-environments according to the independent noise model.
-
----
-
-## 5. Discussion
-
-The integer-participation analysis adds a new layer to the phenomenology of
-superconductors and superfluid helium:
-
-- **Non-trivial integer locking.**  
-  After correcting for structural noise, the Mother Frequency prefers integer
-  participation numbers significantly more than expected from shuffled null models.
-  This is not an artifact of a single family or a handful of outliers: it is a
-  global shift in the \(|\delta|\) distribution with moderate effect size.
-
-- **Structured family differences.**  
-  Families known to host complex or strongly correlated superconductivity
-  (iron-based, heavy-fermion, oxides, some molecular systems) exhibit the strongest
-  integer locking, while high-pressure phases and superfluid helium show weaker
-  but still detectable locking. At the same time, the calibrated base frequencies
-  organize families along a smooth band from \(f_{\text{base}} \sim 1\) to
-  \(f_{\text{base}} \sim 5\).
-
-- **Link to structural noise.**  
-  Structural noise, estimated independently from topological and pressure
-  descriptors, is not neutral: high-noise materials are pushed away from the
-  integer lattice, whereas low-noise materials accumulate near integer
-  participations. This is exactly what one would expect if a coherent oscillatory
-  backbone were being continuously perturbed by structural disorder.
-
-From the perspective of the delayed-oscillator framework, these observations suggest
-a qualitative picture. The Mother Frequency \(F_m^*\) plays the role of a coarse
-grained oscillation whose phase advance per “jump” should ideally be commensurate
-with a discrete lattice of participation numbers. Structural noise and pressure
-perturb that commensurability; in low-noise environments the system can relax toward
-near-integer participation, while in high-noise environments it is smeared away from
-the integer grid.
-
-From a more conventional standpoint, the present work can be read as a purely
-phenomenological statement: once we correct \(\Theta_D / T_c\) by an independent
-structural-noise model, the resulting dimensionless ratios display:
-
-- statistically significant preference for integer participation,
-- reproducible family-specific base frequencies,
-- and a quantitative coupling to a noise proxy.
-
-These are all empirical facts about curated data, independent of whether the DOFT
-framework eventually finds a detailed microscopic realization.
-
----
-
-## 6. Outlook
-
-Several obvious next steps remain:
-
-- **External validation.**  
-  Apply the integer participation pipeline to new superconductors and to additional
-  superfluid systems (e.g. \(^3\)He, mixed phases) as data become available, checking
-  whether their participations and base frequencies fall into the existing bands or
-  populate new ones.
-
-- **Refining the structural noise model.**  
-  The current noise predictor is deliberately simple. Replacing it with more
-  detailed microscopic or ab-initio estimates of disorder and pressure response
-  would provide a sharper test of the noise–locking relationship.
-
-- **Connection to prime-space fingerprints.**  
-  The prime exponents and rational denominators from the previous study and the
-  integer participation numbers from this work are complementary summaries of the
-  same systems. A natural next step is to explore whether particular prime-space
-  fingerprints correlate with specific participation bands, and whether this can
-  be framed as a discrete topology of delayed oscillators.
-
-- **Predictive tests.**  
-  Ultimately, the value of this framework will hinge on its ability to make and
-  pass prospective predictions, for example by flagging materials that are “too
-  far” from integer participation given their structural noise, or by suggesting
-  pressure or compositional changes that move a candidate material toward favorable
-  participation bands.
-
-For now, we view the present work as a second “delivery”: the first showed that a
-simple prime-based grammar can organize superconducting families into stable
-fingerprints; this one shows that, after correcting for structural noise, the Mother
-Frequency itself prefers integer participation in a structured, family-dependent
-way. Whether this ultimately points to a deeper oscillator-based description or
-simply exposes hidden regularities in experimental compilations is a question that
-future data—and perhaps new materials—will decide.
+\end{document}

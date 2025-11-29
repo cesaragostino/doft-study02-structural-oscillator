@@ -60,7 +60,7 @@ def plot_figures(
     rng = np.random.default_rng(seed)
 
     # Align participation with materials for f_base_used and Tc_ideal/ThetaD
-    df = part.merge(merged[["name", "ThetaD_K", "Tc_ideal", "category"]], on="name", how="left", suffixes=("", "_mat"))
+    df = part.merge(merged[["name", "ThetaD_K", "Tc_K", "Tc_ideal", "category"]], on="name", how="left", suffixes=("", "_mat"))
     df["f_base_used"] = pd.to_numeric(df.get("f_base_used"), errors="coerce")
     df["N_value"] = pd.to_numeric(df.get("N_value"), errors="coerce")
     df["delta_value"] = pd.to_numeric(df.get("delta_value"), errors="coerce")
@@ -87,7 +87,7 @@ def plot_figures(
         if vline <= max_n_plot:
             plt.axvline(vline, color="k", linestyle=":", linewidth=0.8)
     plt.xlabel("N_corrected = Fm*/f_base")
-    plt.ylabel("Density")
+    plt.ylabel("Probability density")
     plt.title("Integer participation vs null (N)")
     plt.legend()
     fig1a = output_dir / "fig01a_hist_N_real_vs_shuffle.png"
@@ -106,18 +106,6 @@ def plot_figures(
     plt.ylabel("Density (log scale)")
     plt.title("Integer participation vs null (|delta|)")
     plt.legend()
-    if counts_real.size:
-        peak_idx = int(np.argmax(counts_real))
-        peak_x = (edges_real[peak_idx] + edges_real[peak_idx + 1]) / 2
-        peak_y = max(counts_real[peak_idx], 1e-9)
-        plt.annotate(
-            "Significant Quantization (p < 0.001)",
-            xy=(peak_x, peak_y),
-            xytext=(peak_x + 0.1, peak_y * 5),
-            arrowprops=dict(arrowstyle="->", color="k", lw=1.0),
-            fontsize=9,
-            color="k",
-        )
     plt.text(0.02, plt.ylim()[1] * 0.4, f"KS p={ks_p:.3e}\nMW p={mw_p:.3e}\nCliff's Δ={cliffs_real_null:.2f}", fontsize=9)
     fig1b = output_dir / "fig01b_hist_delta_real_vs_shuffle.png"
     plt.tight_layout()
@@ -171,13 +159,17 @@ def plot_figures(
 
     # Figure 3B: noise for almost-integer vs rest
     cutoff = df["delta_value"].quantile(0.2)
-    near = df[df["delta_value"] <= cutoff]["z_noise"].to_numpy(dtype=float)
-    rest = df[df["delta_value"] > cutoff]["z_noise"].to_numpy(dtype=float)
+    near = df[df["delta_value"] <= cutoff]["z_noise"].dropna().to_numpy(dtype=float)
+    rest = df[df["delta_value"] > cutoff]["z_noise"].dropna().to_numpy(dtype=float)
     cliffs = _cliffs_delta(near, rest)
     plt.figure(figsize=(6, 5))
-    plt.boxplot([near, rest], tick_labels=[f"Almost integer (<=p20, Δ={cliffs:.2f})", "Rest"], showfliers=False)
-    plt.ylabel("Z-score noise")
-    plt.title("Noise vs almost-integer group")
+    if near.size == 0 and rest.size == 0:
+        plt.text(0.5, 0.5, "No data available after filtering", ha="center", va="center")
+        plt.axis("off")
+    else:
+        plt.boxplot([near, rest], tick_labels=[f"Almost integer (<=p20, Δ={cliffs:.2f})", "Rest"], showfliers=False)
+        plt.ylabel("Z-score noise")
+        plt.title("Noise vs almost-integer group")
     fig3b = output_dir / "fig03b_noise_almost_integer_vs_rest.png"
     plt.tight_layout()
     plt.savefig(fig3b, dpi=200)
@@ -212,6 +204,55 @@ def plot_figures(
         plt.tight_layout()
         plt.savefig(fig4a, dpi=200)
         plt.close()
+
+    # Fig S01: Noise (z_noise) by family
+    if "z_noise" in df.columns:
+        df_noise = df.copy()
+        fam_label_map = {
+            "SC_TypeI": "SC_Type-I",
+            "SC_TypeII": "SC_Type-II",
+            "SC_IronBased": "SC_IronBased",
+            "SC_HighPressure": "SC_HighPressure",
+            "SC_Binary": "SC_Binary",
+            "SC_HeavyFermion": "SC_HeavyFermion",
+            "SC_Molecular": "SC_Molecular",
+            "SC_Oxide": "SC_Oxide",
+            "Superfluid": "Superfluid",
+        }
+        df_noise["family_label"] = df_noise["category"].apply(lambda x: fam_label_map.get(x, str(x)))
+        order_noise = df_noise.groupby("family_label")["z_noise"].median().sort_values().index.tolist()
+        data_noise = [df_noise.loc[df_noise["family_label"] == fam, "z_noise"].dropna().to_numpy() for fam in order_noise]
+        plt.figure(figsize=(10, 5))
+        plt.boxplot(data_noise, tick_labels=order_noise, whis=[5, 95], showfliers=False, patch_artist=True)
+        plt.xticks(rotation=45, ha="right")
+        plt.ylabel("Z-score noise")
+        plt.title("Structural noise by family (ordered by median)")
+        figS01 = output_dir / "figS01_noise_by_family.png"
+        plt.tight_layout()
+        plt.savefig(figS01, dpi=200)
+        plt.close()
+
+    # Fig S02: Tc vs Tc_ideal scatter
+    if "Tc_K" in merged.columns and "Tc_ideal" in merged.columns:
+        tc_df = merged.copy()
+        tc_df["Tc_K"] = pd.to_numeric(tc_df["Tc_K"], errors="coerce")
+        tc_df["Tc_ideal"] = pd.to_numeric(tc_df["Tc_ideal"], errors="coerce")
+        tc_df = tc_df.dropna(subset=["Tc_K", "Tc_ideal"])
+        if not tc_df.empty:
+            plt.figure(figsize=(6, 6))
+            plt.scatter(tc_df["Tc_K"], tc_df["Tc_ideal"], alpha=0.5, s=18, color="#2b8cbe")
+            lim = max(tc_df["Tc_K"].max(), tc_df["Tc_ideal"].max()) * 1.05
+            plt.plot([0, lim], [0, lim], "k--", linewidth=1.0, label="Tc_ideal = Tc")
+            plt.xlim(0, lim)
+            plt.ylim(0, lim)
+            plt.xlabel("Tc (K)")
+            plt.ylabel("Tc_ideal = Tc * (1 + predicted_noise) (K)")
+            plt.title("Tc vs Tc_ideal")
+            plt.legend()
+            figS02 = output_dir / "figS02_Tc_vs_Tc_ideal.png"
+            plt.tight_layout()
+            plt.savefig(figS02, dpi=200)
+            plt.close()
 
     print(f"[INFO] Figures written to {output_dir}")
 
