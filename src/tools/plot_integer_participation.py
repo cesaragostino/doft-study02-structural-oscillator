@@ -9,6 +9,7 @@ from typing import Dict, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from scipy import stats
 
 
 def load_data(participation_csv: Path, materials_csv: Path, noise_csv: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -72,13 +73,20 @@ def plot_figures(
 
     # Null sample (representative shuffle)
     n_null_sample, delta_null_sample = generate_shuffle_once(theta, tc_ideal, f_base_arr, rng)
+    delta_real = df["delta_value"].to_numpy(dtype=float)
+    ks_stat, ks_p = stats.ks_2samp(delta_real, delta_null_sample)
+    mw_stat, mw_p = stats.mannwhitneyu(delta_real, delta_null_sample, alternative="less")
+    cliffs_real_null = _cliffs_delta(-delta_real, -delta_null_sample)  # negative means real < null
 
     # Figure 1A: N histogram real vs shuffle
     plt.figure(figsize=(8, 5))
     bins_n = np.linspace(0, max_n_plot, 60)
     plt.hist(df["N_value"], bins=bins_n, alpha=0.6, label="Real", density=True, color="#2b8cbe")
     plt.hist(n_null_sample, bins=bins_n, alpha=0.5, label="Null (shuffle ΘD)", density=True, color="#f03b20")
-    plt.xlabel("N_corrected")
+    for vline in [1, 2, 3, 24, 25]:
+        if vline <= max_n_plot:
+            plt.axvline(vline, color="k", linestyle=":", linewidth=0.8)
+    plt.xlabel("N_corrected = Fm*/f_base")
     plt.ylabel("Density")
     plt.title("Integer participation vs null (N)")
     plt.legend()
@@ -90,13 +98,27 @@ def plot_figures(
     # Figure 1B: |delta| histogram real vs shuffle (log y)
     plt.figure(figsize=(8, 5))
     bins_d = np.linspace(0, delta_cap, 60)
+    counts_real, edges_real = np.histogram(df["delta_value"], bins=bins_d, density=True)
     plt.hist(df["delta_value"], bins=bins_d, alpha=0.7, label="Real", density=True, color="#2b8cbe")
     plt.hist(delta_null_sample, bins=bins_d, alpha=0.5, label="Null (shuffle ΘD)", density=True, color="#f03b20")
     plt.yscale("log")
-    plt.xlabel("|delta|")
+    plt.xlabel("|delta| = |N_corrected - round(N_corrected)|")
     plt.ylabel("Density (log scale)")
     plt.title("Integer participation vs null (|delta|)")
     plt.legend()
+    if counts_real.size:
+        peak_idx = int(np.argmax(counts_real))
+        peak_x = (edges_real[peak_idx] + edges_real[peak_idx + 1]) / 2
+        peak_y = max(counts_real[peak_idx], 1e-9)
+        plt.annotate(
+            "Significant Quantization (p < 0.001)",
+            xy=(peak_x, peak_y),
+            xytext=(peak_x + 0.1, peak_y * 5),
+            arrowprops=dict(arrowstyle="->", color="k", lw=1.0),
+            fontsize=9,
+            color="k",
+        )
+    plt.text(0.02, plt.ylim()[1] * 0.4, f"KS p={ks_p:.3e}\nMW p={mw_p:.3e}\nCliff's Δ={cliffs_real_null:.2f}", fontsize=9)
     fig1b = output_dir / "fig01b_hist_delta_real_vs_shuffle.png"
     plt.tight_layout()
     plt.savefig(fig1b, dpi=200)
@@ -105,13 +127,25 @@ def plot_figures(
     # Figure 2: delta by family
     df_fam = df.copy()
     df_fam["delta_clipped"] = df_fam["delta_value"].clip(upper=delta_cap)
-    order = df_fam.groupby("category")["delta_clipped"].median().sort_values().index.tolist()
+    family_labels = {
+        "SC_TypeI": "SC_Type-I",
+        "SC_TypeII": "SC_Type-II",
+        "SC_IronBased": "SC_IronBased",
+        "SC_HighPressure": "SC_HighPressure",
+        "SC_Binary": "SC_Binary",
+        "SC_HeavyFermion": "SC_HeavyFermion",
+        "SC_Molecular": "SC_Molecular",
+        "SC_Oxide": "SC_Oxide",
+        "Superfluid": "Superfluid",
+    }
+    df_fam["family_label"] = df_fam["category"].apply(lambda x: family_labels.get(x, str(x)))
+    order = df_fam.groupby("family_label")["delta_clipped"].median().sort_values().index.tolist()
+    data_ordered = [df_fam.loc[df_fam["family_label"] == fam, "delta_clipped"].dropna().to_numpy() for fam in order]
     plt.figure(figsize=(10, 5))
-    df_fam.boxplot(column="delta_clipped", by="category", positions=range(len(order)), whis=[5, 95], patch_artist=True)
-    plt.xticks(ticks=range(len(order)), labels=order, rotation=45, ha="right")
-    plt.ylabel("|delta| (clipped)")
-    plt.title("Per-family integer locking strength")
-    plt.suptitle("")
+    plt.boxplot(data_ordered, tick_labels=order, whis=[5, 95], showfliers=False, patch_artist=True)
+    plt.xticks(rotation=45, ha="right")
+    plt.ylabel("|delta| (clipped at 1.0)")
+    plt.title("Per-family integer locking strength (ordered by median)")
     fig2 = output_dir / "fig02_delta_by_family.png"
     plt.tight_layout()
     plt.savefig(fig2, dpi=200)
@@ -123,11 +157,13 @@ def plot_figures(
     colors = plt.cm.tab20(np.linspace(0, 1, len(categories)))
     for col, cat in zip(colors, categories):
         mask = df["category"] == cat
-        plt.scatter(df.loc[mask, "z_noise"], df.loc[mask, "delta_value"], alpha=0.6, s=20, label=cat, color=col)
+        plt.scatter(df.loc[mask, "z_noise"], df.loc[mask, "delta_value"], alpha=0.45, s=18, label=cat, color=col)
+    rho, pval = stats.spearmanr(df["delta_value"], df["z_noise"], nan_policy="omit")
     plt.xlabel("Z-score noise")
     plt.ylabel("|delta|")
     plt.title("Noise vs integer locking")
     plt.legend(fontsize="x-small", ncol=2)
+    plt.text(0.05, plt.ylim()[1] * 0.8, f"Spearman ρ={rho:.3f}, p={pval:.3e}", fontsize=9)
     fig3a = output_dir / "fig03a_delta_vs_noise_scatter.png"
     plt.tight_layout()
     plt.savefig(fig3a, dpi=200)
@@ -139,7 +175,7 @@ def plot_figures(
     rest = df[df["delta_value"] > cutoff]["z_noise"].to_numpy(dtype=float)
     cliffs = _cliffs_delta(near, rest)
     plt.figure(figsize=(6, 5))
-    plt.boxplot([near, rest], labels=[f"Almost integer (<=p20, d={cliffs:.2f})", "Rest"], showfliers=False)
+    plt.boxplot([near, rest], tick_labels=[f"Almost integer (<=p20, Δ={cliffs:.2f})", "Rest"], showfliers=False)
     plt.ylabel("Z-score noise")
     plt.title("Noise vs almost-integer group")
     fig3b = output_dir / "fig03b_noise_almost_integer_vs_rest.png"
@@ -149,14 +185,28 @@ def plot_figures(
 
     # Figure 4A: f_base by family
     if "f_base_used" in df.columns:
-        fam_fbase = df.groupby("category")["f_base_used"].median().sort_values()
+        fam_label_map: Dict[str, str] = {
+            "SC_TypeI": "SC_Type-I",
+            "SC_TypeII": "SC_Type-II",
+            "SC_IronBased": "SC_IronBased",
+            "SC_HighPressure": "SC_HighPressure",
+            "SC_Binary": "SC_Binary",
+            "SC_HeavyFermion": "SC_HeavyFermion",
+            "SC_Molecular": "SC_Molecular",
+            "SC_Oxide": "SC_Oxide",
+            "Superfluid": "Superfluid",
+        }
+        fam_fbase = df.groupby("category")["f_base_used"].median()
+        fam_fbase.index = fam_fbase.index.map(lambda x: fam_label_map.get(x, str(x)))
+        fam_fbase = fam_fbase.sort_values()
         plt.figure(figsize=(10, 5))
         plt.bar(fam_fbase.index, fam_fbase.values, color="#2b8cbe")
         global_line = df["f_base_used"].median()
         plt.axhline(global_line, color="k", linestyle="--", label=f"Global median={global_line:.3f}")
+        plt.yscale("log")
         plt.xticks(rotation=45, ha="right")
         plt.ylabel("f_base_used (median per family)")
-        plt.title("Base frequency by family")
+        plt.title("Base frequency by family (ordered by median)")
         plt.legend()
         fig4a = output_dir / "fig04a_fbase_by_family.png"
         plt.tight_layout()
