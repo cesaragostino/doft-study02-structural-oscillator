@@ -6,7 +6,7 @@
 %Control: page (0) single
 %Control: year (1) truncated
 %Control: production of eprint (0) enabled
-\begin{thebibliography}{0}%
+\begin{thebibliography}{8}%
 \makeatletter
 \providecommand \@ifxundefined [1]{%
  \@ifx{#1\undefined}
@@ -50,4 +50,64 @@
 \providecommand \BibitemShut  [1]{\csname bibitem#1\endcsname}%
 \let\auto@bib@innerbib\@empty
 %</preamble>
+\bibitem [{\citenamefont {Bardeen}\ \emph {et~al.}(1957)\citenamefont
+  {Bardeen}, \citenamefont {Cooper},\ and\ \citenamefont
+  {Schrieffer}}]{BCS1957}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {J.}~\bibnamefont
+  {Bardeen}}, \bibinfo {author} {\bibfnamefont {L.~N.}\ \bibnamefont
+  {Cooper}},\ and\ \bibinfo {author} {\bibfnamefont {J.~R.}\ \bibnamefont
+  {Schrieffer}},\ }\href@noop {} {\bibfield  {journal} {\bibinfo  {journal}
+  {Physical Review}\ }\textbf {\bibinfo {volume} {108}},\ \bibinfo {pages}
+  {1175} (\bibinfo {year} {1957})}\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Tinkham}(1996)}]{Tinkham1996}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {M.}~\bibnamefont
+  {Tinkham}},\ }\href@noop {} {\emph {\bibinfo {title} {Introduction to
+  Superconductivity}}},\ \bibinfo {edition} {2nd}\ ed.\ (\bibinfo  {publisher}
+  {McGraw-Hill},\ \bibinfo {year} {1996})\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Mori}(1965)}]{Mori1965}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {H.}~\bibnamefont
+  {Mori}},\ }\href@noop {} {\bibfield  {journal} {\bibinfo  {journal} {Progress
+  of Theoretical Physics}\ }\textbf {\bibinfo {volume} {33}},\ \bibinfo {pages}
+  {423} (\bibinfo {year} {1965})}\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Zwanzig}(2001)}]{Zwanzig2001}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {R.}~\bibnamefont
+  {Zwanzig}},\ }\href@noop {} {\emph {\bibinfo {title} {Nonequilibrium
+  Statistical Mechanics}}}\ (\bibinfo  {publisher} {Oxford University Press},\
+  \bibinfo {year} {2001})\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Pikovsky}\ \emph {et~al.}(2001)\citenamefont
+  {Pikovsky}, \citenamefont {Rosenblum},\ and\ \citenamefont
+  {Kurths}}]{Pikovsky2001}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {A.}~\bibnamefont
+  {Pikovsky}}, \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont
+  {Rosenblum}},\ and\ \bibinfo {author} {\bibfnamefont {J.}~\bibnamefont
+  {Kurths}},\ }\href@noop {} {\emph {\bibinfo {title} {Synchronization: A
+  Universal Concept in Nonlinear Sciences}}}\ (\bibinfo  {publisher} {Cambridge
+  University Press},\ \bibinfo {year} {2001})\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Guckenheimer}\ and\ \citenamefont
+  {Holmes}(1983)}]{GuckenheimerHolmes1983}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {J.}~\bibnamefont
+  {Guckenheimer}}\ and\ \bibinfo {author} {\bibfnamefont {P.}~\bibnamefont
+  {Holmes}},\ }\href@noop {} {\emph {\bibinfo {title} {Nonlinear Oscillations,
+  Dynamical Systems, and Bifurcations of Vector Fields}}}\ (\bibinfo
+  {publisher} {Springer},\ \bibinfo {year} {1983})\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Efron}\ and\ \citenamefont
+  {Tibshirani}(1993)}]{Efron1993}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {B.}~\bibnamefont
+  {Efron}}\ and\ \bibinfo {author} {\bibfnamefont {R.~J.}\ \bibnamefont
+  {Tibshirani}},\ }\href@noop {} {\emph {\bibinfo {title} {An Introduction to
+  the Bootstrap}}}\ (\bibinfo  {publisher} {Chapman and Hall},\ \bibinfo {year}
+  {1993})\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Cliff}(1993)}]{Cliff1993}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {N.}~\bibnamefont
+  {Cliff}},\ }\href@noop {} {\bibfield  {journal} {\bibinfo  {journal}
+  {Psychological Bulletin}\ }\textbf {\bibinfo {volume} {114}},\ \bibinfo
+  {pages} {494} (\bibinfo {year} {1993})}\BibitemShut {NoStop}%
 \end{thebibliography}%
