@@ -82,17 +82,12 @@ python3 src/tools/plot_integer_participation.py \
   --output-dir data/processed/run_w800_p7919-v7/digest/participation_v4/figures \
   --max-n-plot 40 \
   --delta-cap 1.0 \
-  --n-null 200 \
-  --family-hist SC_Binary \
-  --loss-families SC_Binary SC_HighPressure \
-  --lambda-penalty 0.001 \
-  --bounds 0.5 5.0
+  --n-null 200
 ```
 
 Generated files:
 - Main: `fig01a_hist_N_real_vs_shuffle.png`, `fig01b_hist_delta_real_vs_shuffle.png`, `fig02_delta_by_family.png`, `fig03a_delta_vs_noise_scatter.png`, `fig03b_noise_almost_integer_vs_rest.png`, `fig04a_fbase_by_family.png`.
 - Supplement: `figS01_noise_by_family.png`, `figS02_Tc_vs_Tc_ideal.png`.
-- Extras: `fig_integer_hist_<family>.png` (real vs null |delta| for a chosen family), `fig_delta_vs_zxi.png` (delta vs noise), `fig_Lk_vs_f.png` (loss curves), and `table_dataset_summary.csv` (dataset composition by family/subnet).
 
 ## Repository layout (key files)
 - `src/run_all_pipeline.py`: end-to-end Study 02 pipeline (configs -> noise -> simulator -> digests).
