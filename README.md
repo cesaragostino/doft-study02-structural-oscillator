@@ -94,11 +94,26 @@ Generated files:
 - Supplement: `figS01_noise_by_family.png`, `figS02_Tc_vs_Tc_ideal.png`.
 - Extras: `fig_integer_hist_<family>.png` (real vs null |delta| for a chosen family), `fig_delta_vs_zxi.png` (delta vs noise), `fig_Lk_vs_f.png` (loss curves), and `table_dataset_summary.csv` (dataset composition by family/subnet).
 
+## Coherence-length validation (power-law regression N vs ξ0)
+
+Match experimental coherence lengths to model participation numbers and plot the power-law fit:
+
+```bash
+python3 src/tools/validation_coherence.py \
+  --participation-csv data/processed/run_w800_p7919-v7/digest/participation_v4/participation_summary.csv \
+  --experimental-csv data/raw/experimental_coherence.csv \
+  --output-dir data/processed/run_w800_p7919-v7/digest/participation_v4/validation \
+  --seed 123
+```
+
+Outputs: `validation_coherence_stats.csv` (matched table: Material, Family, N_model, Xi0_exp, Reference) and `validation_coherence_N.png` (log–log scatter with fitted trend).
+
 ## Repository layout (key files)
 - `src/run_all_pipeline.py`: end-to-end Study 02 pipeline (configs -> noise -> simulator -> digests).
 - `src/compute_structural_noise.py`: structural-noise calibration (xi, delta vectors, lambda params).
 - `src/tools/compute_integer_participation.py`: Study 03 integer participation calibration, null models, correlations.
 - `src/tools/plot_integer_participation.py`: figures for participation vs nulls, family comparisons, noise linkage.
+- `src/tools/validation_coherence.py`: matches experimental coherence lengths to participation numbers and fits N ~ xi0^alpha.
 - `src/doft_cluster_simulator/`: simulator core (engine, loss, reporting).
 - `data/raw/`: input CSVs (materials, fingerprints, etc.).
 - `docs/`: study specs and notes.

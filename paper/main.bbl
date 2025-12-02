@@ -6,7 +6,7 @@
 %Control: page (0) single
 %Control: year (1) truncated
 %Control: production of eprint (0) enabled
-\begin{thebibliography}{9}%
+\begin{thebibliography}{13}%
 \makeatletter
 \providecommand \@ifxundefined [1]{%
  \@ifx{#1\undefined}
@@ -119,4 +119,89 @@
   {Cliff}},\ }\href@noop {} {\bibfield  {journal} {\bibinfo  {journal}
   {Psychological Bulletin}\ }\textbf {\bibinfo {volume} {114}},\ \bibinfo
   {pages} {494} (\bibinfo {year} {1993})}\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Giaever}(1960)}]{Giaever1960}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {I.}~\bibnamefont
+  {Giaever}},\ }\href {https://doi.org/10.1103/PhysRevLett.5.147} {\bibfield
+  {journal} {\bibinfo  {journal} {Phys. Rev. Lett.}\ }\textbf {\bibinfo
+  {volume} {5}},\ \bibinfo {pages} {147} (\bibinfo {year} {1960})}\BibitemShut
+  {NoStop}%
+\bibitem [{\citenamefont {Uemura}\ \emph {et~al.}(1991)\citenamefont {Uemura},
+  \citenamefont {Luke}, \citenamefont {Sternlieb}, \citenamefont {Brewer},
+  \citenamefont {Carolan}, \citenamefont {Hardy}, \citenamefont {Kadono},
+  \citenamefont {Kempton}, \citenamefont {Kiefl}, \citenamefont {Kreitzman},
+  \citenamefont {Mulhern}, \citenamefont {Riseman}, \citenamefont {Williams},
+  \citenamefont {Yang}, \citenamefont {Seaman}, \citenamefont {Maple},
+  \citenamefont {Chaikin}, \citenamefont {Sasaki}, \citenamefont {Toyota},
+  \citenamefont {Takagi},\ and\ \citenamefont {Uchida}}]{Luke1991}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {Y.~J.}\ \bibnamefont
+  {Uemura}}, \bibinfo {author} {\bibfnamefont {G.~M.}\ \bibnamefont {Luke}},
+  \bibinfo {author} {\bibfnamefont {B.~J.}\ \bibnamefont {Sternlieb}}, \bibinfo
+  {author} {\bibfnamefont {J.~H.}\ \bibnamefont {Brewer}}, \bibinfo {author}
+  {\bibfnamefont {J.~F.}\ \bibnamefont {Carolan}}, \bibinfo {author}
+  {\bibfnamefont {W.~N.}\ \bibnamefont {Hardy}}, \bibinfo {author}
+  {\bibfnamefont {R.}~\bibnamefont {Kadono}}, \bibinfo {author} {\bibfnamefont
+  {J.~R.}\ \bibnamefont {Kempton}}, \bibinfo {author} {\bibfnamefont {R.~F.}\
+  \bibnamefont {Kiefl}}, \bibinfo {author} {\bibfnamefont {S.~R.}\ \bibnamefont
+  {Kreitzman}}, \bibinfo {author} {\bibfnamefont {P.}~\bibnamefont {Mulhern}},
+  \bibinfo {author} {\bibfnamefont {T.~M.}\ \bibnamefont {Riseman}}, \bibinfo
+  {author} {\bibfnamefont {D.~L.}\ \bibnamefont {Williams}}, \bibinfo {author}
+  {\bibfnamefont {B.~X.}\ \bibnamefont {Yang}}, \bibinfo {author}
+  {\bibfnamefont {C.~L.}\ \bibnamefont {Seaman}}, \bibinfo {author}
+  {\bibfnamefont {M.~B.}\ \bibnamefont {Maple}}, \bibinfo {author}
+  {\bibfnamefont {P.}~\bibnamefont {Chaikin}}, \bibinfo {author} {\bibfnamefont
+  {T.}~\bibnamefont {Sasaki}}, \bibinfo {author} {\bibfnamefont
+  {N.}~\bibnamefont {Toyota}}, \bibinfo {author} {\bibfnamefont
+  {H.}~\bibnamefont {Takagi}},\ and\ \bibinfo {author} {\bibfnamefont
+  {S.}~\bibnamefont {Uchida}},\ }\href
+  {https://doi.org/10.1103/PhysRevLett.66.2666} {\bibfield  {journal} {\bibinfo
+   {journal} {Phys. Rev. Lett.}\ }\textbf {\bibinfo {volume} {66}},\ \bibinfo
+  {pages} {2666} (\bibinfo {year} {1991})},\ \bibinfo {note} {includes $\mu$SR
+  data for A15 compounds like Nb$_3$Sn}\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Wang}\ \emph {et~al.}(2016)\citenamefont {Wang},
+  \citenamefont {Zhang}, \citenamefont {Xu}, \citenamefont {Zeng},
+  \citenamefont {Miao}, \citenamefont {Xu}, \citenamefont {Qian}, \citenamefont
+  {Weng}, \citenamefont {Richard}, \citenamefont {Fedorov}, \citenamefont
+  {Ding}, \citenamefont {Dai},\ and\ \citenamefont {Fang}}]{Wang2016}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {Z.}~\bibnamefont
+  {Wang}}, \bibinfo {author} {\bibfnamefont {P.}~\bibnamefont {Zhang}},
+  \bibinfo {author} {\bibfnamefont {G.}~\bibnamefont {Xu}}, \bibinfo {author}
+  {\bibfnamefont {L.~K.}\ \bibnamefont {Zeng}}, \bibinfo {author}
+  {\bibfnamefont {H.}~\bibnamefont {Miao}}, \bibinfo {author} {\bibfnamefont
+  {X.}~\bibnamefont {Xu}}, \bibinfo {author} {\bibfnamefont {T.}~\bibnamefont
+  {Qian}}, \bibinfo {author} {\bibfnamefont {H.}~\bibnamefont {Weng}}, \bibinfo
+  {author} {\bibfnamefont {P.}~\bibnamefont {Richard}}, \bibinfo {author}
+  {\bibfnamefont {A.~V.}\ \bibnamefont {Fedorov}}, \bibinfo {author}
+  {\bibfnamefont {H.}~\bibnamefont {Ding}}, \bibinfo {author} {\bibfnamefont
+  {X.}~\bibnamefont {Dai}},\ and\ \bibinfo {author} {\bibfnamefont
+  {Z.}~\bibnamefont {Fang}},\ }\href@noop {} {\bibfield  {journal} {\bibinfo
+  {journal} {Phys. Rev. B}\ }\textbf {\bibinfo {volume} {92}},\ \bibinfo
+  {pages} {115119} (\bibinfo {year} {2016})},\ \bibinfo {note} {sTM
+  measurements of coherence length in Iron-based SC}\BibitemShut {NoStop}%
+\bibitem [{\citenamefont {Drozdov}\ \emph {et~al.}(2019)\citenamefont
+  {Drozdov}, \citenamefont {Kong}, \citenamefont {Minkov}, \citenamefont
+  {Besedin}, \citenamefont {Kuzovnikov}, \citenamefont {Mozaffari},
+  \citenamefont {Balicas}, \citenamefont {Balakirev}, \citenamefont {Graf},
+  \citenamefont {Prakapenka}, \citenamefont {Greenberg}, \citenamefont
+  {Knyazev}, \citenamefont {Tkacz},\ and\ \citenamefont
+  {Eremets}}]{Drozdov2019}%
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {A.~P.}\ \bibnamefont
+  {Drozdov}}, \bibinfo {author} {\bibfnamefont {P.~P.}\ \bibnamefont {Kong}},
+  \bibinfo {author} {\bibfnamefont {V.~S.}\ \bibnamefont {Minkov}}, \bibinfo
+  {author} {\bibfnamefont {S.~P.}\ \bibnamefont {Besedin}}, \bibinfo {author}
+  {\bibfnamefont {M.~A.}\ \bibnamefont {Kuzovnikov}}, \bibinfo {author}
+  {\bibfnamefont {S.}~\bibnamefont {Mozaffari}}, \bibinfo {author}
+  {\bibfnamefont {L.}~\bibnamefont {Balicas}}, \bibinfo {author} {\bibfnamefont
+  {F.~F.}\ \bibnamefont {Balakirev}}, \bibinfo {author} {\bibfnamefont {D.~E.}\
+  \bibnamefont {Graf}}, \bibinfo {author} {\bibfnamefont {V.~B.}\ \bibnamefont
+  {Prakapenka}}, \bibinfo {author} {\bibfnamefont {E.}~\bibnamefont
+  {Greenberg}}, \bibinfo {author} {\bibfnamefont {D.~A.}\ \bibnamefont
+  {Knyazev}}, \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Tkacz}},\
+  and\ \bibinfo {author} {\bibfnamefont {M.~I.}\ \bibnamefont {Eremets}},\
+  }\href {https://doi.org/10.1038/s41586-019-1201-8} {\bibfield  {journal}
+  {\bibinfo  {journal} {Nature}\ }\textbf {\bibinfo {volume} {569}},\ \bibinfo
+  {pages} {528} (\bibinfo {year} {2019})}\BibitemShut {NoStop}%
 \end{thebibliography}%
