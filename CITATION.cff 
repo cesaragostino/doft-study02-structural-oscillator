@@ -5,18 +5,18 @@ type: software
 authors:
   - family-names: Agostino
     given-names: Cesar
-repository-code: "https://github.com/cesaragostino/doft-study01-superconductors"
+repository-code: "https://github.com/cesaragostino/doft-study02-structural-oscillator"
 version: "v0.1.0"
-date-released: 2025-11-XX
-doi: 10.5281/zenodo.XXXX
+date-released: 2025-12-01
+doi: 10.5281/zenodo.17784477
 preferred-citation:
   type: article
-  title: "DOFT Study 02: Structural Oscillator Models for Layered Systems and Noise Propagation"
+  title: "Integer participation and structural noise in superconducting clusters"
   authors:
     - family-names: Agostino
       given-names: Cesar
   year: 2025
   # Update these fields once the paper or preprint is public.
   journal: "to be updated"
-  # doi: 10.XXXX/XXXXX
+  # doi: 10.5281/zenodo.17784477
   # url: "https://arxiv.org/abs/XXXX.XXXXX"
