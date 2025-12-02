@@ -1,6 +1,10 @@
-# DOFT-study02-structural-oscillator
+# Integer participation and structural noise in superconducting clusters (Zenodo package)
 
-Code and data for DOFT Study 02: structural oscillator models, structural-noise calibration, and integer participation analysis.
+This archive contains the code, data and scripts for the paper:
+
+> C. Agostino, *Integer participation and structural noise in superconducting clusters* (2025).
+
+All paths below are relative to the root of this Zenodo package (`doft-study02-superconductors-zenodo-v1/`).
 
 ## Environment
 
@@ -10,14 +14,14 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Python >=3.10 recommended (tested on 3.13). `openpyxl` is required for the XLSX digests written by the pipeline.
+Python >=3.10 recommended (tested on 3.13). `openpyxl` is required for XLSX digests.
 
-## End-to-end pipeline (Study 02 core)
+## One-shot pipeline (configs → noise → simulator → participation → figs → validation)
 
-Example run (v7 data, all materials):
+From the package root:
 
 ```bash
-python3 src/run_all_pipeline.py \
+python3 notebook/run_all_pipeline.py \
   --results-root data/raw/fingerprint-run2-v7/results_w800_p7919 \
   --materials-csv data/raw/materials_clusters_real_v7.csv \
   --tag fp_kappa_w800_p7919 \
@@ -35,26 +39,28 @@ python3 src/run_all_pipeline.py \
   --pressure-ref 200 \
   --c-pressure 0.05 \
   --run-sensitivity --sensitivity-perturbations 200 --sensitivity-epsilon 0.05 \
-  --run-loo
+  --run-loo \
+  --participation-permutations 1000 \
+  --participation-bounds 0.5 5.0 \
+  --participation-lambda 0.001 \
+  --plot-max-n 40 --plot-delta-cap 1.0 --plot-n-null 200 \
+  --plot-family-hist SC_Binary \
+  --plot-loss-families SC_Binary SC_HighPressure \
+  --experimental-csv data/raw/experimental_coherence.csv
 ```
 
-Pipeline steps:
-- Generate simulator configs (`material_config_*.json`, `ground_truth_targets_*.json`, `loss_weights_default_*.json`) under `<output-root>/configs`.
-- Compute structural noise (`structural_noise_summary.csv` / `structural_noise_values.json`) under `<output-root>/structural_noise/` and inject `xi`, `xi_sign`, `delta_*`, and `lambda_*` into configs.
-- Run the simulator per material under `<output-root>/runs/<material>/`.
-- Build digests in `<output-root>/digest/` (CSV + XLSX summaries, including simulator, noise, pressure, sensitivity/LOO if enabled).
+What it produces under `data/processed/run_w800_p7919-v7/`:
+- `configs/`: simulator configs per material (`material_config_*`, `ground_truth_targets_*`, `loss_weights_*`).
+- `structural_noise/`: `structural_noise_summary.csv` / `structural_noise_values.json`.
+- `runs/`: simulator outputs per material.
+- `digest/`: CSV/XLSX digests (simulator/noise/pressure; sensitivity if enabled; LOO if enabled).
+- `digest/participation_v4/`: integer-participation outputs and figures.
+- `digest/participation_v4/validation/`: coherence-length validation table and plot.
 
-Notes:
-- `--eta` is auto-resolved inside `src/run_all_pipeline.py` from `--results-root` (expects `calibration_metadata_calib_{tag}.json` in `calib/`).
-- Use `--materials all` to process every material in `materials-csv`; otherwise pass an explicit list.
-- Remove `--fit-noise-by-category` to use a single global zeta.
-
-## Integer participation (Study 03 add-on)
-
-Robust calibration and null tests:
+## Integer participation only (if you already ran the core pipeline)
 
 ```bash
-python3 src/tools/compute_integer_participation.py \
+python3 notebook/tools/compute_integer_participation.py \
   --materials-csv data/raw/materials_clusters_real_v7.csv \
   --noise-csv data/processed/run_w800_p7919-v7/structural_noise/structural_noise_summary.csv \
   --mode global per_family \
@@ -66,16 +72,12 @@ python3 src/tools/compute_integer_participation.py \
   --seed 123
 ```
 
-Outputs:
-- `participation_summary.csv` with per-material participation metrics (`N_value`, `delta_value`, `f_base_used`, z-scored noise, null-model p-values).
-- `participation_manifest.json` with run metadata and winning hypothesis (Fm vs Fm/2).
+Outputs: `participation_summary.csv` and `participation_manifest.json`.
 
-## Figures (Study 03)
-
-Use the plotting script to generate all figures (main + supplement):
+## Figures (main + supplement + extras)
 
 ```bash
-python3 src/tools/plot_integer_participation.py \
+python3 notebook/tools/plot_integer_participation.py \
   --participation-csv data/processed/run_w800_p7919-v7/digest/participation_v4/participation_summary.csv \
   --materials-csv data/raw/materials_clusters_real_v7.csv \
   --noise-csv data/processed/run_w800_p7919-v7/structural_noise/structural_noise_summary.csv \
@@ -86,34 +88,40 @@ python3 src/tools/plot_integer_participation.py \
   --family-hist SC_Binary \
   --loss-families SC_Binary SC_HighPressure \
   --lambda-penalty 0.001 \
-  --bounds 0.5 5.0
+  --bounds 0.5 5.0 \
+  --seed 123
 ```
 
 Generated files:
 - Main: `fig01a_hist_N_real_vs_shuffle.png`, `fig01b_hist_delta_real_vs_shuffle.png`, `fig02_delta_by_family.png`, `fig03a_delta_vs_noise_scatter.png`, `fig03b_noise_almost_integer_vs_rest.png`, `fig04a_fbase_by_family.png`.
 - Supplement: `figS01_noise_by_family.png`, `figS02_Tc_vs_Tc_ideal.png`.
-- Extras: `fig_integer_hist_<family>.png` (real vs null |delta| for a chosen family), `fig_delta_vs_zxi.png` (delta vs noise), `fig_Lk_vs_f.png` (loss curves), and `table_dataset_summary.csv` (dataset composition by family/subnet).
+- Extras: `fig_integer_hist_<family>.png` (real vs null |delta| for a chosen family), `fig_delta_vs_zxi.png` (delta vs noise), `fig_Lk_vs_f.png` (loss curves), `table_dataset_summary.csv`.
 
-## Coherence-length validation (power-law regression N vs ξ0)
-
-Match experimental coherence lengths to model participation numbers and plot the power-law fit:
+## Coherence-length validation (power-law N vs ξ0)
 
 ```bash
-python3 src/tools/validation_coherence.py \
+python3 notebook/tools/validation_coherence.py \
   --participation-csv data/processed/run_w800_p7919-v7/digest/participation_v4/participation_summary.csv \
   --experimental-csv data/raw/experimental_coherence.csv \
   --output-dir data/processed/run_w800_p7919-v7/digest/participation_v4/validation \
   --seed 123
 ```
 
-Outputs: `validation_coherence_stats.csv` (matched table: Material, Family, N_model, Xi0_exp, Reference) and `validation_coherence_N.png` (log–log scatter with fitted trend).
+Outputs: `validation_coherence_stats.csv` (Material, Family, N_model, Xi0_exp, Reference) and `validation_coherence_N.png` (log–log scatter with fitted trend).
 
-## Repository layout (key files)
-- `src/run_all_pipeline.py`: end-to-end Study 02 pipeline (configs -> noise -> simulator -> digests).
-- `src/compute_structural_noise.py`: structural-noise calibration (xi, delta vectors, lambda params).
-- `src/tools/compute_integer_participation.py`: Study 03 integer participation calibration, null models, correlations.
-- `src/tools/plot_integer_participation.py`: figures for participation vs nulls, family comparisons, noise linkage.
-- `src/tools/validation_coherence.py`: matches experimental coherence lengths to participation numbers and fits N ~ xi0^alpha.
-- `src/doft_cluster_simulator/`: simulator core (engine, loss, reporting).
-- `data/raw/`: input CSVs (materials, fingerprints, etc.).
-- `docs/`: study specs and notes.
+## Repository layout (Zenodo)
+
+- `notebook/run_all_pipeline.py`: orchestrates full pipeline for this package.
+- `notebook/compute_structural_noise.py`: structural-noise calibration.
+- `notebook/tools/compute_integer_participation.py`: integer participation calibration/nulls.
+- `notebook/tools/plot_integer_participation.py`: figures.
+- `notebook/tools/validation_coherence.py`: coherence-length validation.
+- `notebook/tools/sensitivity_analysis.py`, `notebook/tools/loo_validation.py`: sensitivity/LOO.
+- `notebook/doft_cluster_simulator/`: simulator core.
+- `data/raw/`: input CSVs (materials, fingerprints, experimental coherence).
+- `paper/`: manuscript sources.
+
+Notes:
+- All scripts assume execution from the package root; `notebook/` is added to `PYTHONPATH` internally by `run_all_pipeline.py`.
+- For a lean run (skip participation/plots/validation), add `--skip-participation` to the pipeline command.
+

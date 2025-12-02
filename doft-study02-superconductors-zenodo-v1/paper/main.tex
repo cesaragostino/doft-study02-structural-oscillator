@@ -63,7 +63,7 @@ or sampling from smooth continuous distributions.
 The distribution of $|\deltalock| = |\Ncorr - \mathrm{round}(\Ncorr)|$
 is significantly more concentrated near zero than the nulls
 (Kolmogorov--Smirnov and Mann--Whitney $p \lesssim 10^{-13}$,
-Cliff's $\Delta \simeq 0.3$),
+Cliff's $\Delta \simeq 0.35$),
 indicating genuine integer locking rather than a discretization artefact.
 Across families, we find a robust hierarchy of base frequencies:
 iron-based superconductors cluster near $\fbase \simeq 1$,
@@ -82,7 +82,7 @@ Finally, we show that materials with almost-integer participation
 systematically exhibit lower structural noise:
 the top 20\% with smallest $|\deltalock|$ have a substantially
 lower noise $z$--score than the rest of the dataset
-(Cliff's $\Delta \simeq -0.47$).
+(Cliff's $\Delta \simeq -0.58$).
 Together, these results suggest that the mother frequency $\Fm$
 probes a discrete oscillator structure underpinning both superconductivity
 and superfluidity, with family-dependent harmonics shaped
@@ -268,7 +268,12 @@ All results reported below use this per-family calibration.
   $T_c^{\mathrm{med}}$ and $\Theta_D^{\mathrm{med}}$ are the median
   critical and Debye temperatures, $\langle N\rangle$ is the mean
   participation number, and $\tilde\delta_{\mathrm{med}}$ the median
-  integer mismatch.}
+  integer mismatch.
+  For the SC\_TypeII family, the mean participation number
+  $\langle N\rangle \simeq 3.3\times 10^{4}$ is dominated by a single
+  ultra-low-$T_c$ metal (Rh, with $N \sim 6\times 10^{5}$); the median
+  $N$ for this family is of order $10^{2}$ and is more representative
+  of the bulk.}
   \label{tab:dataset_summary}
   \begin{ruledtabular}
   \begin{tabular}{lrrrrrrrrrr}
@@ -350,32 +355,32 @@ If the participation number $N$ quantifies the effective delay or number
 of lattice cycles required to establish coherence, it should correlate with 
 the physical size of the Cooper pair, the coherence length $\xi_0$. 
 To test this hypothesis, we compiled experimental $\xi_0$ values for a 
-subset of $M=11$ representative materials spanning Type I, Binary, Iron-based, 
-and Hydride families.
+subset of $M=10$ representative materials spanning type-I, type-II, binary, 
+iron-based and high-pressure families.
 
 Data sources include tunneling spectroscopy for Nb \cite{Giaever1960} and Al, 
 $\mu$SR for Nb$_3$Sn \cite{Luke1991} and FeSe \cite{Wang2016}, and upper critical 
 field estimates for LaH$_{10}$ at 150 GPa \cite{Drozdov2019}.
 
-Figure X displays the relationship between the DOFT participation number $N$ 
-and the experimental $\xi_0$. We observe a strong positive correlation ($R^2 \approx 0.90$) 
-described by a power law $N \propto \xi_0^\alpha$, with $\alpha \approx 0.8$. 
-This trend bridges three orders of magnitude in length scale:
+\figref{fig:N_vs_xi0} displays the relationship between the DOFT participation number $N$ 
+and the experimental $\xi_0$. We observe a positive trend that can be 
+approximated by a power law $N \propto \xi_0^\alpha$, with 
+$\alpha \approx 0.43$ and coefficient of determination $R^2 \simeq 0.46$. 
+This trend bridges multiple orders of magnitude in length scale:
 \begin{itemize}
-    \item \textbf{Diffusive Limit ($N \gg 1$):} Classical Type-I superconductors 
+    \item \textbf{Diffusive limit ($N \gg 1$):} Classical type-I superconductors 
     like Al ($\xi_0 \approx 1600$ nm) exhibit large participation numbers 
     ($N \approx 74$), consistent with a delocalized coherence state that 
     requires many lattice cycles to synchronize.
-    \item \textbf{Confinement Limit ($N \sim 1$):} High-pressure hydrides 
+    \item \textbf{Confinement limit ($N \sim 1$):} High-pressure hydrides 
     like LaH$_{10}$ ($\xi_0 \approx 1.5$ nm) show fractional or unitary 
     participation ($N \approx 0.4$), suggesting a regime of maximal confinement 
     where coherence is established within a single lattice cycle.
 \end{itemize}
 
-While the global trend is robust, specific families like iron-based superconductors 
-(e.g., FeSe) show deviations from the universal fit, pointing to family-specific 
-confinement geometries (e.g., 2D vs 3D) that merit further study. Nevertheless, 
-this connection provides a first bridge between the thermodynamic frequency 
+The sample size is small and the scatter in $N$ at fixed $\xi_0$ is substantial, 
+so this scaling should be interpreted as preliminary. Nevertheless, 
+it provides a first bridge between the thermodynamic frequency 
 ratio $F_m$ and the spatial geometry of the superconducting state.
 
 % -- TO APPROVE --
@@ -457,12 +462,14 @@ We now relate locking strength to structural noise.
 \figref{fig:delta_vs_noise} plots $|\deltalock^{(i)}|$
 against the noise $z$--score $\znoise^{(i)}$, with points
 colored by family.
-Despite considerable scatter, there is a clear positive
+Despite considerable scatter, there is a weak positive
 monotonic trend:
-the Spearman correlation is
-$\rho \simeq 0.34$ with $p \simeq 5.6 \times 10^{-4}$.
+the Spearman rank correlation between $|\deltalock|$ and $\znoise$ is
+$\rho \simeq 0.30$ with $p \simeq 0.05$ (95\% CI approximately
+$[-0.03,\,0.60]$).
 Materials with higher structural noise tend to deviate more from
-integer participation.
+integer participation, although the present sample size limits the
+strength of this conclusion.
 
 \begin{figure}
   \centering
@@ -471,7 +478,7 @@ integer participation.
   Stability Mechanism.
   (a) Correlation between distance to integer and structural noise.
   (b) Materials satisfying the integer condition ($|\delta|$ in lowest 20\%) show 
-  significantly lower structural noise (Cliff's $\delta \approx -0.47$).
+  significantly lower structural noise (Cliff's $\delta \approx -0.58$).
   This suggests that integer resonance acts as a protective mechanism for coherence.
   }
   \label{fig:delta_vs_noise}
@@ -482,7 +489,7 @@ The same relationship is visible when comparing groups.
 $\znoise$ for the ``almost-integer'' group
 (top 20\% lowest $|\deltalock|$) and the rest of the dataset.
 The almost-integer materials have markedly lower noise,
-with Cliff's $\Delta \simeq -0.47$, a large negative effect size.
+with Cliff's $\Delta \simeq -0.58$, a large negative effect size.
 
 \begin{figure}
   \centering
@@ -492,7 +499,7 @@ with Cliff's $\Delta \simeq -0.47$, a large negative effect size.
   ``almost-integer'' group (top 20\% smallest $|\deltalock|$)
   and for the rest of the dataset.
   The almost-integer group is shifted toward lower noise,
-  with Cliff's $\Delta \simeq -0.47$.
+  with Cliff's $\Delta \simeq -0.58$.
   }
   \label{fig:noise_almost_integer}
 \end{figure}
@@ -618,13 +625,29 @@ to $1/2$, is consistent with a quasi-ballistic or diffusive propagation
 regime in which spatial extent grows sub-linearly with the number of effective 
 scattering or delay events encoded in $N$.
 
+An interesting outlier in Fig.~\ref{fig:N_vs_xi0} is the iron-based
+superconductor FeSe. It exhibits a very short coherence length
+($\xi_0 \sim 2$--$3$ nm) but only a moderate participation number
+($N \sim 10$), placing it well below the fitted $N$--$\xi_0$ trend.
+In other words, FeSe achieves strong spatial confinement without
+approaching the ``unitary'' $N \sim 1$ regime that characterizes
+LaH$_{10}$. This behaviour is consistent with the strongly
+anisotropic, quasi-two-dimensional and multiband nature of FeSe,
+where coherence is likely constrained by orbital- and band-selective
+effects rather than by a single scalar length scale. The deviation
+of FeSe from the simple power-law suggests that iron-based
+superconductors may realize a distinct confinement geometry that
+cannot be captured by a universal exponent relating $N$ and $\xi_0$,
+and therefore merit a dedicated analysis beyond the scope of the
+present work.
+
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.95\columnwidth]{figures/validation_coherence_N.png}
 \caption{%
 \textbf{Geometric manifestation of integer participation.} 
 Participation number $N = F_m^* / f_{\mathrm{base}}$ vs.\ experimental coherence 
-length $\xi_0$ for 11 representative superconductors. The dashed line shows 
+length $\xi_0$ for 10 representative superconductors. The dashed line shows 
 a power-law fit $N \sim \xi_0^{0.43}$ ($R^2 = 0.455$), spanning nearly four 
 orders of magnitude. Materials with $N \approx 1$ (e.g., FeSe) exhibit 
 ultra-short coherence lengths (maximal confinement), while large-$N$ systems 

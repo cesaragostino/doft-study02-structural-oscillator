@@ -18,15 +18,23 @@ python3 src/run_all_pipeline.py \
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from doft_cluster_simulator.data import PRIMES
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+NOTEBOOK_ROOT = REPO_ROOT / "notebook"
+TOOLS_ROOT = NOTEBOOK_ROOT / "tools"
+ENV = os.environ.copy()
+ENV["PYTHONPATH"] = f"{str(NOTEBOOK_ROOT)}:{ENV.get('PYTHONPATH','')}"
 
-def run_cmd(cmd: List[str], cwd: Path) -> None:
-    result = subprocess.run(cmd, cwd=str(cwd))
+
+def run_cmd(cmd: List[str], cwd: Optional[Path] = None) -> None:
+    workdir = cwd or REPO_ROOT
+    result = subprocess.run(cmd, cwd=str(workdir), env=ENV)
     if result.returncode != 0:
         raise RuntimeError(f"Command failed: {' '.join(cmd)}")
 
@@ -630,17 +638,17 @@ def main() -> None:
         help="Relative noise level for perturbations (e.g., 0.05 = ±5%)",
     )
     parser.add_argument("--run-loo", action="store_true", help="Run leave-one-out validation across families")
-    parser.add_argument("--skip-participation", action="store_true", help="Skip integer participation/null-model analysis")
-    parser.add_argument("--participation-subset", nargs="*", help="Materials to use when calibrating f_base")
-    parser.add_argument("--participation-subset-category", nargs="*", help="Categories to use for f_base calibration")
-    parser.add_argument("--participation-permutations", type=int, default=400, help="Permutations for null models")
-    parser.add_argument("--participation-thresholds", nargs="*", help="Thresholds for |delta| fractions (e.g. 0.02 0.01)")
-    parser.add_argument("--participation-bin-width", type=float, default=0.01, help="Bin width for |delta| histogram")
-    parser.add_argument("--participation-max-delta", type=float, default=0.5, help="Max |delta| for histogram")
-    parser.add_argument("--participation-max-n", type=int, default=500, help="Max grid N when calibrating f_base")
-    parser.add_argument("--participation-grid-size", type=int, default=400, help="Grid size for f_base coarse search")
-    parser.add_argument("--participation-refine-steps", type=int, default=200, help="Refinement steps for f_base search")
-    parser.add_argument("--participation-f-base", type=float, help="Optional override for f_base (skip calibration)")
+    parser.add_argument("--skip-participation", action="store_true", help="Skip integer participation analysis and plotting")
+    parser.add_argument("--participation-permutations", type=int, default=1000, help="Permutations for participation null models")
+    parser.add_argument("--participation-bounds", nargs=2, type=float, default=(0.5, 5.0), help="Bounds for f_base search")
+    parser.add_argument("--participation-lambda", type=float, default=0.001, help="Penalty term for participation loss")
+    parser.add_argument("--participation-output", type=Path, help="Output directory for participation results")
+    parser.add_argument("--plot-max-n", type=float, default=40.0, help="Max N axis for plots")
+    parser.add_argument("--plot-delta-cap", type=float, default=1.0, help="Max |delta| axis for plots")
+    parser.add_argument("--plot-n-null", type=int, default=200, help="Null samples for plotting histograms")
+    parser.add_argument("--plot-family-hist", type=str, default="SC_Binary", help="Family for real vs null delta histogram")
+    parser.add_argument("--plot-loss-families", nargs="*", default=None, help="Families to include in loss-curve figure")
+    parser.add_argument("--experimental-csv", type=Path, default=Path("data/raw/experimental_coherence.csv"), help="Experimental coherence CSV for validation")
     args = parser.parse_args()
 
     output_root = args.output_root
@@ -671,7 +679,7 @@ def main() -> None:
     # 1) Generate DOFT configs
     gen_cmd = [
         "python3",
-        "src/tools/generate_doft_configs.py",
+        str(TOOLS_ROOT / "generate_doft_configs.py"),
         "--results-root",
         str(args.results_root),
         "--tag",
@@ -686,7 +694,7 @@ def main() -> None:
     if material_list:
         gen_cmd += ["--materials", *material_list]
     print("[INFO] Generating DOFT configs…")
-    run_cmd(gen_cmd, cwd=Path("."))
+    run_cmd(gen_cmd)
 
     # Discover materials based on generated configs to avoid missing targets
     available_materials = detect_materials_from_configs(configs_dir)
@@ -703,7 +711,7 @@ def main() -> None:
         print("[INFO] Computing structural noise (xi, delta_T, delta_space, delta_P)…")
         noise_cmd = [
             "python3",
-            "src/compute_structural_noise.py",
+            str(NOTEBOOK_ROOT / "compute_structural_noise.py"),
             "--materials-csv",
             str(args.materials_csv),
             "--output-csv",
@@ -721,7 +729,7 @@ def main() -> None:
         noise_cmd += ["--default-delta-space", str(args.default_delta_space)]
         noise_cmd += ["--c-pressure", str(args.c_pressure)]
         noise_cmd += ["--pressure-ref", str(args.pressure_ref)]
-        run_cmd(noise_cmd, cwd=Path("."))
+        run_cmd(noise_cmd)
         if noise_json.exists():
             import json as _json
 
@@ -746,7 +754,7 @@ def main() -> None:
             sim_cmd = [
                 "python3",
                 "-m",
-                "src.doft_cluster_simulator.cli",
+                "doft_cluster_simulator.cli",
                 "--config",
                 str(config_path),
                 "--targets",
@@ -766,7 +774,7 @@ def main() -> None:
                 sim_cmd += ["--bounds", *parse_bounds(args.bounds)]
             if args.huber_delta is not None:
                 sim_cmd += ["--huber-delta", str(args.huber_delta)]
-            run_cmd(sim_cmd, cwd=Path("."))
+            run_cmd(sim_cmd)
 
     # 4) Build digests for configs, simulator, and structural noise
     print("[INFO] Building digests (configs, simulator, noise, pressure)…")
@@ -789,43 +797,86 @@ def main() -> None:
         build_pressure_digest(noise_json, sim_summary_path, digest_dir, pressure_lookup)
 
     if not args.skip_participation:
-        participation_dir = digest_dir / "participation"
+        participation_dir = args.participation_output or (digest_dir / "participation_v4")
+        part_summary = participation_dir / "participation_summary.csv"
+        print("[INFO] Running integer participation analysis…")
         part_cmd = [
             "python3",
-            "src/tools/integer_participation.py",
+            str(TOOLS_ROOT / "compute_integer_participation.py"),
             "--materials-csv",
             str(args.materials_csv),
+            "--noise-csv",
+            str(noise_csv),
+            "--mode",
+            "global",
+            "per_family",
+            "--hypotheses",
+            "Fm",
+            "Fm_div_2",
+            "--n-permutations",
+            str(args.participation_permutations),
+            "--bounds",
+            str(args.participation_bounds[0]),
+            str(args.participation_bounds[1]),
+            "--lambda-penalty",
+            str(args.participation_lambda),
             "--output-dir",
             str(participation_dir),
-            "--bin-width",
-            str(args.participation_bin_width),
-            "--max-delta",
-            str(args.participation_max_delta),
-            "--permutations",
-            str(args.participation_permutations),
-            "--max-n",
-            str(args.participation_max_n),
-            "--grid-size",
-            str(args.participation_grid_size),
-            "--refine-steps",
-            str(args.participation_refine_steps),
             "--seed",
             str(args.seed),
         ]
-        if args.participation_thresholds:
-            part_cmd += ["--thresholds", *args.participation_thresholds]
-        if args.participation_subset:
-            part_cmd += ["--subset", *args.participation_subset]
-        if args.participation_subset_category:
-            part_cmd += ["--subset-category", *args.participation_subset_category]
-        if args.participation_f_base is not None:
-            part_cmd += ["--f-base-override", str(args.participation_f_base)]
-        if materials:
-            part_cmd += ["--materials", *materials]
-        if noise_csv.exists():
-            part_cmd += ["--noise-csv", str(noise_csv)]
-        print("[INFO] Running integer participation + noise coupling analysis…")
-        run_cmd(part_cmd, cwd=Path("."))
+        run_cmd(part_cmd)
+
+        print("[INFO] Generating participation figures…")
+        plot_cmd = [
+            "python3",
+            str(TOOLS_ROOT / "plot_integer_participation.py"),
+            "--participation-csv",
+            str(part_summary),
+            "--materials-csv",
+            str(args.materials_csv),
+            "--noise-csv",
+            str(noise_csv),
+            "--output-dir",
+            str(participation_dir / "figures"),
+            "--max-n-plot",
+            str(args.plot_max_n),
+            "--delta-cap",
+            str(args.plot_delta_cap),
+            "--n-null",
+            str(args.plot_n_null),
+            "--family-hist",
+            args.plot_family_hist,
+            "--lambda-penalty",
+            str(args.participation_lambda),
+            "--bounds",
+            str(args.participation_bounds[0]),
+            str(args.participation_bounds[1]),
+            "--seed",
+            str(args.seed),
+        ]
+        if args.plot_loss_families:
+            plot_cmd += ["--loss-families", *args.plot_loss_families]
+        run_cmd(plot_cmd)
+
+        if args.experimental_csv.exists():
+            print("[INFO] Running coherence-length validation…")
+            val_out = participation_dir / "validation"
+            val_cmd = [
+                "python3",
+                str(TOOLS_ROOT / "validation_coherence.py"),
+                "--participation-csv",
+                str(part_summary),
+                "--experimental-csv",
+                str(args.experimental_csv),
+                "--output-dir",
+                str(val_out),
+                "--seed",
+                str(args.seed),
+            ]
+            run_cmd(val_cmd)
+        else:
+            print(f"[WARN] Experimental coherence CSV not found: {args.experimental_csv}")
 
     # Optional stability validations
     if args.run_sensitivity and not args.skip_noise:
@@ -836,10 +887,11 @@ def main() -> None:
             sens_out.mkdir(parents=True, exist_ok=True)
             print("[INFO] Running sensitivity analysis per material…")
             for mat in materials:
+                print(f"[INFO]  Sensitivity -> {mat}")
                 out_csv = sens_out / f"sensitivity_{mat}.csv"
                 sens_cmd = [
                     "python3",
-                    "src/tools/sensitivity_analysis.py",
+                    str(TOOLS_ROOT / "sensitivity_analysis.py"),
                     "--materials-csv",
                     str(args.materials_csv),
                     "--noise-json",
@@ -857,7 +909,7 @@ def main() -> None:
                     "--output",
                     str(out_csv),
                 ]
-                run_cmd(sens_cmd, cwd=Path("."))
+                run_cmd(sens_cmd)
     if args.run_loo and not args.skip_noise:
         if not noise_json.exists():
             print("[WARN] LOO validation skipped: noise JSON not found.")
@@ -865,14 +917,14 @@ def main() -> None:
             loo_out = digest_dir / "loo_validation.csv"
             loo_cmd = [
                 "python3",
-                "src/tools/loo_validation.py",
+                str(TOOLS_ROOT / "loo_validation.py"),
                 "--noise-json",
                 str(noise_json),
                 "--output",
                 str(loo_out),
             ]
             print("[INFO] Running leave-one-out validation…")
-            run_cmd(loo_cmd, cwd=Path("."))
+            run_cmd(loo_cmd)
 
     print(f"[DONE] Pipeline completed. Outputs under: {output_root}")
 
